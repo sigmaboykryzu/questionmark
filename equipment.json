@@ -1,0 +1,11 @@
+{
+  "sp": 0,
+  "sp_plus": 0,
+  "sp_x": 0,
+  "sp_caret": 0,
+  "owned": [],
+  "equipped": {
+    "gauntlet": null,
+    "device": null
+  }
+}

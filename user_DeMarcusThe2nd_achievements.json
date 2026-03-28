@@ -1,0 +1,52 @@
+{
+  "first_win": {
+    "unlocked": false,
+    "name": "First Victory",
+    "desc": "Win your first sequence"
+  },
+  "ten_wins": {
+    "unlocked": false,
+    "name": "Dedicated Player",
+    "desc": "Win 10 sequences"
+  },
+  "fifty_wins": {
+    "unlocked": false,
+    "name": "Master Deductor",
+    "desc": "Win 50 sequences"
+  },
+  "hundred_rolls": {
+    "unlocked": true,
+    "name": "Persistent",
+    "desc": "Make 100 rolls"
+  },
+  "thousand_rolls": {
+    "unlocked": false,
+    "name": "Obsessed",
+    "desc": "Make 1000 rolls"
+  },
+  "auto_unlock": {
+    "unlocked": false,
+    "name": "Automation Expert",
+    "desc": "Unlock auto-roll"
+  },
+  "speed_demon": {
+    "unlocked": false,
+    "name": "Speed Demon",
+    "desc": "Win a sequence in under 50 rolls"
+  },
+  "perfectionist": {
+    "unlocked": false,
+    "name": "Perfectionist",
+    "desc": "Win 3 sequences in a row"
+  },
+  "explorer": {
+    "unlocked": false,
+    "name": "Property Explorer",
+    "desc": "Discover all 15 properties"
+  },
+  "night_owl": {
+    "unlocked": false,
+    "name": "Night Owl",
+    "desc": "Play between 12 AM and 6 AM"
+  }
+}

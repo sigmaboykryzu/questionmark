@@ -1,0 +1,28 @@
+{
+  "total_rolls": 43,
+  "total_wins": 0,
+  "best_streak": 0,
+  "current_streak": 0,
+  "fastest_win": Infinity,
+  "slowest_win": 0,
+  "avg_rolls_per_win": 0,
+  "property_discoveries": {
+    "Has Numbers": 35,
+    "Has Repeats": 37,
+    "Has Lowercase": 43,
+    "Has Vowels": 39,
+    "Has Symbols": 42,
+    "Has Consecutive Letters": 43,
+    "Has Uppercase": 42,
+    "Has Punctuation": 36,
+    "Ends With Symbol": 12,
+    "Is Long": 24,
+    "Has Spaces": 11,
+    "Is Very Long": 13,
+    "Has Operators": 30,
+    "Has Multiple Words": 10,
+    "Starts With Letter": 25
+  },
+  "play_time": 55.12850069999695,
+  "start_time": 1774641973.349933
+}
