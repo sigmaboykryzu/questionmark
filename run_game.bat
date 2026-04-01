@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-python questionmark.py
+pythonw questionmark.py
 pause
