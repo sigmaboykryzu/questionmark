@@ -115,34 +115,6 @@ class RollingGame:
         self.tutorial_mode = False
         self.tutorial_step = 0
         
-        # Daily Challenge System
-        self.daily_challenges = self._init_daily_challenges()
-        self.challenge_progress = self._load_challenge_progress()
-        
-        # Game Modes & Tournaments
-        self.game_modes = {
-            "Classic": {"name": "Classic", "desc": "Standard gameplay", "multiplier": 1.0},
-            "Speed Run": {"name": "Speed Run", "desc": "10 wins fast", "multiplier": 1.5},
-            "Hardcore": {"name": "Hardcore", "desc": "One loss = game over", "multiplier": 2.0},
-        }
-        self.current_mode = "Classic"
-        self.tournaments = {
-            "weekly": {"name": "Weekly", "rounds": 5, "prize": 50},
-            "monthly": {"name": "Monthly", "rounds": 10, "prize": 200},
-        }
-        self.tournament_wins = 0
-        self.current_tournament = None
-        
-        # SP and Equipment System
-        self.sp = 0  # Regular SP (5 characters)
-        self.sp_plus = 0  # SP+ (10 characters)
-        self.sp_x = 0  # SPx (20 characters)
-        self.sp_caret = 0  # SP^ (40+ characters)
-        self.equipped_gauntlet = None  # Left hand
-        self.equipped_device = None  # Right hand
-        self.equipment_inventory = self._load_equipment()
-        self._init_equipment_recipes()
-        
         # Difficulty setting
         self.difficulty = "normal"        
         # April Fools Event (v1.67)
@@ -157,6 +129,44 @@ class RollingGame:
         self.john_pork_elixir = {"count": 0, "sp_boost": 67}
         self.facebook_test_mode = False
         self.dev_console_open = False
+        self.v167_language = "bussin"
+        
+        # v1.677676767... (EXTENDED VERSION - GENUINE THE MOST TUFF THING EVER) - INIT EARLY!
+        self.version_1_67_mode = self._check_april_fools_or_v167_mode()
+        self.v167_equipment_unlocked = self.version_1_67_mode
+        self.purple_text_property = self.version_1_67_mode  # Purple text property active on April Fools
+        
+        # Daily Challenge System (AFTER v1.67 mode is set)
+        self.daily_challenges = self._init_daily_challenges()
+        self.challenge_progress = self._load_challenge_progress()
+        
+        # Game Modes & Tournaments
+        self.game_modes = {
+            "Classic": {"name": "Classic", "desc": "Standard gameplay", "multiplier": 1.0},
+            "Speed Run": {"name": "Speed Run", "desc": "10 wins fast", "multiplier": 1.5},
+            "Hardcore": {"name": "Hardcore", "desc": "One loss = game over", "multiplier": 2.0},
+            "Victory Royale 1.67": {"name": "Victory Royale 1.67", "desc": "Guess sequence is SUPER TUFF - JS PEAK ENERGY", "multiplier": 2.5},
+        }
+        self.current_mode = "Classic"
+        self.tournaments = {
+            "weekly": {"name": "Weekly", "rounds": 5, "prize": 50},
+            "monthly": {"name": "Monthly", "rounds": 10, "prize": 200},
+        }
+        self.tournament_wins = 0
+        self.current_tournament = None
+        
+        # Difficulty setting
+        self.difficulty = "normal"
+        
+        # SP and Equipment System
+        self.sp = 0  # Regular SP (5 characters)
+        self.sp_plus = 0  # SP+ (10 characters)
+        self.sp_x = 0  # SPx (20 characters)
+        self.sp_caret = 0  # SP^ (40+ characters)
+        self.equipped_gauntlet = None  # Left hand
+        self.equipped_device = None  # Right hand
+        self.equipment_inventory = self._load_equipment()
+        self._init_equipment_recipes()
 
         
         # Analytics
@@ -187,8 +197,20 @@ class RollingGame:
             "analysis_device": {"type": "device", "cost": {"sp_plus": 1}, "effect": "see_extra_prop", "desc": "See 1 extra property"},
             "fortune_device": {"type": "device", "cost": {"sp_plus": 2}, "effect": "luck_boost", "desc": "+15% luck in rolls"},
             "mastery_device": {"type": "device", "cost": {"sp_x": 1}, "effect": "fast_analysis", "desc": "Properties reveal 30% faster"},
-            "infinity_device": {"type": "device", "cost": {"sp_caret": 1}, "effect": "perfect_vision", "desc": "See all target properties"}
+            "infinity_device": {"type": "device", "cost": {"sp_caret": 1}, "effect": "perfect_vision", "desc": "See all target properties"},
+            # v1.677676... LEGENDARY EQUIPMENT (LIMITED EDITION - APRIL FOOLS)
+            "thors_hammer": {"type": "gauntlet", "cost": {"sp_caret": 2}, "effect": "ultimate_power", "desc": "⚡ THOR'S HAMMER - ULTRA BUSSIN POWER! +100 SP on hit!", "rarity": "LEGENDARY", "v167_only": True},
+            "infinity_gauntlet": {"type": "gauntlet", "cost": {"sp_caret": 3}, "effect": "infinity_control", "desc": "♾️ INFINITY GAUNTLET - PEAK RIZZ ENERGY! Control all properties!", "rarity": "MYTHIC", "v167_only": True},
+            "67_gauntlet": {"type": "gauntlet", "cost": {"sp_caret": 1}, "effect": "lucky_67", "desc": "67️⃣ THE 67 GAUNTLET - EZZZ MODE ACTIVATED! Math goes BUSSIN!", "rarity": "EPIC", "v167_only": True},
+            "mathematical_gauntlet": {"type": "gauntlet", "cost": {"sp_caret": 1}, "effect": "math_power", "desc": "📐 MATHEMATICAL GAUNTLET - (67/67 + sqrt² + 67+71 - 67-65) = DUPER COOL!", "rarity": "EPIC", "v167_only": True},
         }
+    
+    def _check_april_fools_or_v167_mode(self):
+        """Check if today is April Fools or if v1.67 mode is enabled"""
+        from datetime import datetime
+        today = datetime.now()
+        is_april_fools = (today.month == 4 and today.day in [1, 2])
+        return is_april_fools
     
     
     def _init_april_fools_pranks(self):
@@ -257,18 +279,18 @@ class RollingGame:
             self.john_pork_elixir["count"] += 1
             self.sp += 67  # John Pork Elixir bonus
             self.troll_level += 2
-            return "🐰 YO THIS CHOCOLATE BUNNY BUSSIN! +67 SP OMEGA TUFF! LLOLOLOL 🐰"
+            return "🐰 YO THIS CHOCOLATE BUNNY BUSSIN! +67 SP OMEGA TUFF!🐰"
         
         easter_eggs = {
-            "QUESTIONMARK": "🎪 YO THIS PEAK RIZZ ENERGY! SUPER BUSSIN! 🎪",
+            "QUESTIONMARK": "🎪 YO THIS PEAK RIZZ ENERGY! 🎪",
             "APRILFOOLS": "🃏 OGMGMGMGM THE TRICKSTER RIZZ EXTREME! 🃏",
-            "ROLLINGGAME": "🎲 DUPER COOL ROLLING EZZZ VIBES! 🎲",
-            "TROLL": "👹 ULTRA TROLL MODE ACTIVATED! BUSSIN! 👹",
+            "ROLLINGGAME": "🎲 DUPER COOL ROLLING EZZZ! 🎲",
+            "TROLL": "👹 ULTRA TROLL MODE ACTIVATED! 👹",
             "CHAOS": "⚡ OMEGA CHAOS MODE UNLOCKED TUFF! ⚡",
-            "SECRET": "🔐 PEAK SECRET VIBES REVEALED EZZZ! 🔐",
+            "SECRET": "🔐 PEAK SECRET VIBES REVEALED! 🔐",
             "CHEAT": "💀 YO CHEATER RIZZ! (WE NOT SNITCHING THO) 💀",
             "HIDDEN": "👁️ DUPER EXTREME ALL SEEING BUSSIN MODE! 👁️",
-            "JOHNPORK": "🍗 JOHN PORK ULTRA POWER! +67 SP EZZZ! BUSSIN! 🍗",
+            "JOHNPORK": "🍗 JOHN PORK ULTRA POWER! +67! 🍗",
         }
         
         if code.upper() in easter_eggs:
@@ -289,10 +311,26 @@ class RollingGame:
         if self.troll_level > 5:
             bonus += 25
         return bonus
+    
+    def get_v167_feedback_message(self):
+        """Get v1.677676... April Fools feedback message (GENUINE THE MOST TUFF THING EVER)"""
+        messages = [
+            "🐰 THIS IS BUSSIN FRFR! +67 SP POWER!",
+            "⚡ JS PEAK ENERGY! EXTREME DUPER BTC MINER MODE!",
+            "💜 PURPLE TEXT VIBES UNLOCKED! WHY NOT THO??",
+            "👑 VICTORY ROYALE 1.67 - GUESS IS SUPER TUFF!",
+            "🔧 THOR'S HAMMER ACTIVATED! OMEGA RIZZ!",
+            "♾️ INFINITY GAUNTLET POWER! CONTROL ALL!",
+            "67️⃣ THE 67 GAUNTLET MAKES THIS EZZZ!",
+            "📐 MATHEMATICAL MAGIC: (67/67 + sqrt² + 67+71 - 67-65) = DUPER COOL!",
+            "🎪 APRIL FOOLS MODE IS PEAK! OGMGMGMGM!",
+            "💯 THIS UPDATE IS EZZZ CONFIRMED!"
+        ]
+        return random.choice(messages)
 
     def _init_daily_challenges(self):
         """Initialize daily challenges system"""
-        return {
+        challenges = {
             "challenge_1": {"name": "Quick Thinker", "desc": "Win 3 sequences", "target": 3, "reward_sp": 5, "icon": "⚡"},
             "challenge_2": {"name": "Accuracy Master", "desc": "Win 5 sequences", "target": 5, "reward_sp": 8, "icon": "🎯"},
             "challenge_3": {"name": "SP+ Collector", "desc": "Earn 3 SP+", "target": 3, "reward_sp": 10, "icon": "⬆"},
@@ -302,6 +340,14 @@ class RollingGame:
             "challenge_7": {"name": "Perfect Series", "desc": "Win 3 in a row", "target": 3, "reward_sp": 20, "icon": "🔥"},
             "challenge_8": {"name": "Long String Master", "desc": "Win with 25+ char string", "target": 1, "reward_sp": 18, "icon": "📝"}
         }
+        
+        # April Fools Challenge Modifiers (v1.677676...)
+        if self.version_1_67_mode:
+            challenges["april_fools_1"] = {"name": "Victory Royale 1.67", "desc": "Win in Victory Royale 1.67 mode - SUPER TUFF", "target": 1, "reward_sp": 50, "icon": "👑", "modifier": "2x multiplier"}
+            challenges["april_fools_2"] = {"name": "JS Peak Energy", "desc": "Use Victory Royale mode (EXTREME DUPER BTC MINER ENERGY)", "target": 3, "reward_sp": 35, "icon": "⚙️", "modifier": "unlock_v167_items"}
+            challenges["april_fools_3"] = {"name": "Purple Text Master", "desc": "Identify purple text properties", "target": 5, "reward_sp": 40, "icon": "💜", "modifier": "feedback_messages"}
+        
+        return challenges
     
     def _load_challenge_progress(self):
         """Load daily challenge progress"""
@@ -416,6 +462,10 @@ class RollingGame:
             "is_very_long",
             "has_consecutive_letters"
         ]
+        
+        # v1.677676... April Fools: Add purple text property (WHY NOT??)
+        if self.purple_text_property:
+            possible_properties.append("has_purple_text_vibes")  # Feedback messages property
         
         # Randomly select target properties based on difficulty
         if self.difficulty == "easy":
