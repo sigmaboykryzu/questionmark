@@ -144,7 +144,15 @@ class RollingGame:
         self._init_equipment_recipes()
         
         # Difficulty setting
-        self.difficulty = "normal"
+        self.difficulty = "normal"        
+        # April Fools Event (v1.67)
+        self.april_fools_active = True
+        self.april_fools_mode = "chaos"  # chaos, normal, hilarious
+        self.prank_count = 0
+        self.pranks_triggered = []
+        self.easter_eggs_found = 0
+        self.troll_level = 0
+
         
         # Analytics
         self.total_rolls_ever = 0
@@ -177,6 +185,93 @@ class RollingGame:
             "infinity_device": {"type": "device", "cost": {"sp_caret": 1}, "effect": "perfect_vision", "desc": "See all target properties"}
         }
     
+    
+    def _init_april_fools_pranks(self):
+        """Initialize April Fools pranks"""
+        self.pranks = {
+            "reverse_colors": {"name": "Reverse Colors", "chance": 0.05, "active": False},
+            "backwards_text": {"name": "Backwards Text", "chance": 0.08, "active": False},
+            "upside_down": {"name": "Upside Down UI", "chance": 0.03, "active": False},
+            "zalgo_text": {"name": "Zalgo Text", "chance": 0.06, "active": False},
+            "invisible_buttons": {"name": "Invisible Buttons", "chance": 0.04, "active": False},
+            "random_sounds": {"name": "Random Sounds", "chance": 0.07, "active": False},
+            "exploding_text": {"name": "Exploding Text", "chance": 0.05, "active": False},
+            "spinning_cursor": {"name": "Spinning Cursor", "chance": 0.06, "active": False},
+        }
+    
+    def trigger_april_fools_prank(self):
+        """Randomly trigger April Fools prank"""
+        if not self.april_fools_active or random.random() > 0.15:
+            return None
+        
+        import random
+        prank_list = list(self.pranks.keys())
+        selected_prank = random.choice(prank_list)
+        self.pranks[selected_prank]["active"] = True
+        self.prank_count += 1
+        self.pranks_triggered.append(selected_prank)
+        
+        prank_messages = {
+            "reverse_colors": "🎭 COLORS REVERSED! 🎭",
+            "backwards_text": "txet sdrawkcab gnihtyreve!",
+            "upside_down": "⊥hƃᴉɹ ǝɯoɔ ⅂I",
+            "zalgo_text": "Z̸͓̰͎͎͔̭̘̦̻̟̗͔͎̦̹̪̓a̶̧̛̤̤̳̠͓͎̯̤̭̟͙̣̰͉̐̉̃̐̅l̶̬̖̞̓̈́̾͋g̴̝̗̹̤̻̯͎̎̐̉̈̈́o̸̡̭̪̞̼͚͖̘̣̒͐̀̒̓̆͘!",
+            "invisible_buttons": "where did the buttons go? 👻",
+            "random_sounds": "🔊 SOUND CHECK! 🔊",
+            "exploding_text": "💥 TEXT OVERLOAD 💥",
+            "spinning_cursor": "🌪️ SPINNING! 🌪️",
+        }
+        
+        return prank_messages.get(selected_prank, f"Prank: {selected_prank}")
+    
+    def apply_april_fools_effect(self):
+        """Apply active April Fools effects"""
+        for prank_name, prank_data in self.pranks.items():
+            if prank_data["active"]:
+                if prank_name == "reverse_colors":
+                    # Reverse color scheme
+                    self.current_theme = "light" if self.current_theme == "dark" else "dark"
+                
+                elif prank_name == "zalgo_text":
+                    # Add zalgo characters randomly
+                    pass
+                
+                elif prank_name == "random_sounds":
+                    # Play random sound effect
+                    try:
+                        import winsound
+                        winsound.Beep(random.randint(100, 2000), random.randint(50, 200))
+                    except:
+                        pass
+    
+    def find_easter_egg(self, code):
+        """Hidden Easter Egg system"""
+        easter_eggs = {
+            "QUESTIONMARK": "🎪 YOU FOUND THE MASTER EGG! 🎪",
+            "APRILFOOLS": "🃏 The Trickster smiles... 🃏",
+            "ROLLINGGAME": "🎲 Rolling in the deep... 🎲",
+            "TROLL": "👹 Troll mode activated! 👹",
+            "CHAOS": "⚡ CHAOS MODE UNLOCKED ⚡",
+            "SECRET": "🔐 Hidden secrets revealed! 🔐",
+            "CHEAT": "💀 Cheater! (But I won't tell) 💀",
+            "HIDDEN": "👁️ All seeing eye mode 👁️",
+        }
+        
+        if code.upper() in easter_eggs:
+            self.easter_eggs_found += 1
+            self.troll_level += 1
+            return easter_eggs[code.upper()]
+        return None
+    
+    def april_fools_bonus_sp(self):
+        """Give bonus SP if April Fools pranks have been triggered"""
+        bonus = self.prank_count * 2
+        if self.easter_eggs_found > 0:
+            bonus += self.easter_eggs_found * 5
+        if self.troll_level > 5:
+            bonus += 25
+        return bonus
+
     def _init_daily_challenges(self):
         """Initialize daily challenges system"""
         return {
@@ -508,6 +603,13 @@ class RollingGame:
                                         command=self.show_history_window, width=15)
         self.history_button.pack(side=tk.LEFT, padx=5)
         
+        # April Fools Event Button
+        self.april_button = tk.Button(button_frame, text="🃏 Event", font=("Arial", 11, "bold"),
+                                     bg="#ff6600", fg="#000000", padx=15, pady=10,
+                                     activebackground="#ff6600", activeforeground="#000000",
+                                     command=self.show_april_fools_menu, width=8)
+        self.april_button.pack(side=tk.LEFT, padx=5)
+        
         self.quit_button = tk.Button(button_frame, text="❌ QUIT", font=("Arial", 12, "bold"),
                                      bg="#cc0000", fg="#ffffff", padx=20, pady=10,
                                      activebackground="#cc0000", activeforeground="#ffffff",
@@ -643,7 +745,8 @@ class RollingGame:
             unlocked.append("Automation Expert")
         
         # Check for speed demon (win in under 30 rolls)
-        if self.stats.get('fastest_win', float('inf')) <= 30 and not self.achievements["speed_demon"]["unlocked"]:
+        fastest = self.stats.get('fastest_win')
+        if fastest and isinstance(fastest, (int, float)) and fastest <= 30 and not self.achievements["speed_demon"]["unlocked"]:
             self.achievements["speed_demon"]["unlocked"] = True
             unlocked.append("Speed Demon")
         
@@ -1300,6 +1403,12 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
             self.match_label.config(text="⚡ AUTO-ROLL UNLOCKED! ⚡", fg="#00ff00", font=("Arial", 14, "bold"))
     
     def manual_roll(self):
+        # 🃏 April Fools prank trigger
+        prank_msg = self.trigger_april_fools_prank()
+        if prank_msg and self.april_fools_active:
+            self.match_label.config(text=prank_msg, fg="#ff6600")
+            self.apply_april_fools_effect()
+        
         """Perform a manual roll"""
         self.roll_count += 1
         s = self._generate_random_string()
@@ -1441,6 +1550,64 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
         self.auto_button.config(state=tk.NORMAL, text="⚡ AUTO-ROLL")
         self.roll_button.config(state=tk.NORMAL)
     
+    
+    def show_april_fools_menu(self):
+        """Show April Fools event menu"""
+        event_win = tk.Toplevel(self.root)
+        event_win.title("🃏 April Fools Event 🃏")
+        event_win.geometry("500x400")
+        event_win.configure(bg="#2b2b2b")
+        
+        title = tk.Label(event_win, text="🎉 APRIL FOOLS EVENT 🎉", 
+                        font=("Arial", 16, "bold"), bg="#2b2b2b", fg="#ff6600")
+        title.pack(pady=10)
+        
+        info_text = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎭 APRIL FOOLS MODE ACTIVE 🎭
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Pranks Triggered:    {self.prank_count}
+Easter Eggs Found:   {self.easter_eggs_found}
+Troll Level:         {self.troll_level}
+
+Current Prank:       {self.pranks_triggered[-1] if self.pranks_triggered else 'None'}
+
+Active Pranks:
+{chr(10).join([f"  ✓ {p}: {'ACTIVE' if self.pranks[p]['active'] else 'off'}" for p in list(self.pranks.keys())[:4]])}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Event Bonus SP: +{self.april_fools_bonus_sp()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎪 Find all hidden Easter Eggs!
+🎲 Survive the Pranks!
+👹 Unlock Troll Mode!
+"""
+        
+        info_label = tk.Label(event_win, text=info_text, font=("Courier", 9),
+                             bg="#1e1e1e", fg="#00ff00", justify=tk.LEFT)
+        info_label.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        
+        # Easter egg code entry
+        code_frame = tk.Frame(event_win, bg="#2b2b2b")
+        code_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        tk.Label(code_frame, text="Secret Code:", bg="#2b2b2b", fg="#fff").pack(side=tk.LEFT)
+        code_entry = tk.Entry(code_frame, bg="#333", fg="#0f0", font=("Courier", 10))
+        code_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        def check_code():
+            code = code_entry.get()
+            result = self.find_easter_egg(code)
+            if result:
+                import tkinter.messagebox as messagebox
+                messagebox.showinfo("Easter Egg Found!", result)
+                code_entry.delete(0, tk.END)
+        
+        tk.Button(code_frame, text="Check", command=check_code, bg="#00aa00", 
+                 fg="#000", font=("Arial", 9)).pack(side=tk.LEFT, padx=5)
+
     def show_history_window(self):
         """Show roll history in new window"""
         if not self.rolls_history:

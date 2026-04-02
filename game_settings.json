@@ -1,0 +1,8 @@
+{
+  "sound_enabled": true,
+  "animations_enabled": true,
+  "background_music_enabled": true,
+  "show_stats_on_win": true,
+  "auto_save_enabled": true,
+  "current_theme": "dark"
+}
