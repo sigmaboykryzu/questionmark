@@ -24,8 +24,10 @@ class AccountManager:
     """Handles user account management"""
     def __init__(self):
         self.accounts_file = "accounts.json"
+        self.remembered_accounts_file = "remembered_accounts.json"
         self.current_user = None
         self.accounts = self._load_accounts()
+        self.remembered_accounts = self._load_remembered_accounts()
     
     def _load_accounts(self):
         """Load all accounts from file"""
@@ -77,9 +79,38 @@ class AccountManager:
         self.current_user = username
         account["last_played"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._save_accounts()
+        self._remember_account(username)  # Remember this account
         return True, "Login successful"
     
-    def get_user_data_file(self, username):
+    def _load_remembered_accounts(self):
+        """Load remembered accounts list"""
+        if os.path.exists(self.remembered_accounts_file):
+            try:
+                with open(self.remembered_accounts_file, 'r') as f:
+                    data = json.load(f)
+                    return data.get("remembered", [])
+            except:
+                return []
+        return []
+    
+    def _save_remembered_accounts(self):
+        """Save remembered accounts list"""
+        with open(self.remembered_accounts_file, 'w') as f:
+            json.dump({"remembered": self.remembered_accounts}, f, indent=2)
+    
+    def _remember_account(self, username):
+        """Add username to remembered accounts"""
+        if username not in self.remembered_accounts:
+            self.remembered_accounts.insert(0, username)
+            # Keep only last 5 remembered accounts
+            self.remembered_accounts = self.remembered_accounts[:5]
+            self._save_remembered_accounts()
+    
+    def forget_account(self, username):
+        """Remove username from remembered accounts"""
+        if username in self.remembered_accounts:
+            self.remembered_accounts.remove(username)
+            self._save_remembered_accounts()
         """Get the data file path for a user"""
         return f"user_{username}_data.json"
     
@@ -480,13 +511,48 @@ class RollingGame:
         """Show account login/register screen"""
         login_root = tk.Tk()
         login_root.title("Questionmark - Account Login")
-        login_root.geometry("400x350")
+        login_root.geometry("450x500")
         login_root.configure(bg="#2b2b2b")
         login_root.resizable(False, False)
         
         title_label = tk.Label(login_root, text="Questionmark", font=("Arial", 16, "bold"),
                               bg="#2b2b2b", fg="#00ff00")
         title_label.pack(pady=20)
+        
+        # Remembered accounts frame
+        remembered_frame = tk.Frame(login_root, bg="#2b2b2b")
+        remembered_frame.pack(pady=10, padx=10, fill=tk.X)
+        
+        if self.account_manager.remembered_accounts:
+            tk.Label(remembered_frame, text="Recent Accounts:", bg="#2b2b2b", fg="#aaaaaa",
+                    font=("Arial", 9, "italic")).pack(anchor="w")
+            
+            def quick_login(username):
+                def inner():
+                    username_entry.delete(0, tk.END)
+                    username_entry.insert(0, username)
+                    password_entry.focus()
+                return inner
+            
+            for acc in self.account_manager.remembered_accounts:
+                def create_forget(u):
+                    def forget():
+                        self.account_manager.forget_account(u)
+                        login_root.destroy()
+                        self.show_login_screen()
+                    return forget
+                
+                acc_btn_frame = tk.Frame(remembered_frame, bg="#1e1e1e")
+                acc_btn_frame.pack(fill=tk.X, pady=2)
+                
+                acc_btn = tk.Button(acc_btn_frame, text=f"  {acc}  ", command=quick_login(acc),
+                                   bg="#333333", fg="#00ff00", font=("Arial", 10),
+                                   anchor="w", justify=tk.LEFT)
+                acc_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2, pady=2)
+                
+                forget_btn = tk.Button(acc_btn_frame, text="✕", command=create_forget(acc),
+                                      bg="#662222", fg="#ff6b6b", font=("Arial", 8), width=3)
+                forget_btn.pack(side=tk.LEFT, padx=2, pady=2)
         
         # Username frame
         uname_frame = tk.Frame(login_root, bg="#2b2b2b")
