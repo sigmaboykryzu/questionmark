@@ -111,6 +111,8 @@ class AccountManager:
         if username in self.remembered_accounts:
             self.remembered_accounts.remove(username)
             self._save_remembered_accounts()
+    
+    def get_user_data_file(self, username):
         """Get the data file path for a user"""
         return f"user_{username}_data.json"
     
@@ -137,6 +139,11 @@ class RollingGame:
         self.target_properties = set()
         self.game_won = False
         self.auto_rolling = False
+        
+        # Auto-roll Speed Control (NO DELAYS!)
+        self.autoroll_speed = 100  # Speed in ms (lower = faster)
+        self.autoroll_min_speed = 10  # Minimum 10ms
+        self.autoroll_max_speed = 2000  # Maximum 2000ms
         self.wins_count = 0
         self.current_theme = "dark"
         self.sound_enabled = True
@@ -167,6 +174,17 @@ class RollingGame:
         self.v167_equipment_unlocked = self.version_1_67_mode
         self.purple_text_property = self.version_1_67_mode  # Purple text property active on April Fools
         self._init_april_fools_pranks()  # Initialize pranks before daily challenges
+        self._init_skill_tree()
+        self._init_tournaments()
+        self._init_dungeons()
+        self._init_seasonal_system()
+        self._init_daily_quests()
+        self._init_prestige_system()
+        self._init_pvp_system()
+        self._init_collection_system()
+        self._init_cosmetics()
+        self._init_marketplace()
+        self._init_guilds()
         
         # Daily Challenge System (AFTER v1.67 mode is set)
         self.daily_challenges = self._init_daily_challenges()
@@ -245,6 +263,331 @@ class RollingGame:
         return is_april_fools
     
     
+    
+    def _init_tournaments(self):
+        """Initialize comprehensive tournament system"""
+        self.tournaments = {
+            "weekly": {
+                "name": "Weekly Challenge",
+                "desc": "5 rounds, win against progressively harder sequences",
+                "rounds": 5,
+                "prize": 50,
+                "type": "elimination",
+                "difficulty_multiplier": 1.5,
+                "active": True,
+                "reset_day": "Monday"
+            },
+            "monthly": {
+                "name": "Monthly Championship",
+                "desc": "10 rounds, compete for massive rewards",
+                "rounds": 10,
+                "prize": 200,
+                "type": "bracket",
+                "difficulty_multiplier": 2.0,
+                "active": True,
+                "reset_day": "1st"
+            },
+            "seasonal": {
+                "name": "Seasonal Tournament",
+                "desc": "Compete across 30 days for legendary rewards",
+                "rounds": 30,
+                "prize": 500,
+                "type": "points_based",
+                "difficulty_multiplier": 2.5,
+                "active": True,
+                "reset_day": "Monthly"
+            },
+            "speed_run": {
+                "name": "Speed Run Championship",
+                "desc": "Complete sequences in minimum rolls",
+                "rounds": 10,
+                "prize": 100,
+                "type": "speed",
+                "difficulty_multiplier": 1.8,
+                "active": True,
+                "reset_day": "Weekly"
+            },
+            "accuracy": {
+                "name": "Accuracy Masters",
+                "desc": "Highest accuracy across 20 rounds",
+                "rounds": 20,
+                "prize": 150,
+                "type": "accuracy",
+                "difficulty_multiplier": 1.6,
+                "active": True,
+                "reset_day": "Weekly"
+            },
+            "endurance": {
+                "name": "Endurance Trial",
+                "desc": "50 consecutive wins without resets",
+                "rounds": 50,
+                "prize": 300,
+                "type": "endurance",
+                "difficulty_multiplier": 2.2,
+                "active": True,
+                "reset_day": "Monthly"
+            }
+        }
+        self.tournament_stats = {}
+        self.current_tournament = None
+        self.tournament_round = 0
+        self.tournament_wins = 0
+        self.tournament_scores = {}
+        self.tournament_ranks = {}
+        self._init_tournament_scores()
+    
+    def _init_tournament_scores(self):
+        """Initialize tournament score tracking"""
+        for t_name in self.tournaments:
+            self.tournament_scores[t_name] = 0
+            self.tournament_ranks[t_name] = 0
+    
+    
+    def _init_skill_tree(self):
+        """Initialize comprehensive skill tree"""
+        self.skills = {
+            # Offensive Skills
+            "keen_eye": {"name": "Keen Eye", "level": 1, "max_level": 10, "cost_base": 5, "effect": "+2% property detection per level"},
+            "pattern_master": {"name": "Pattern Master", "level": 1, "max_level": 10, "cost_base": 8, "effect": "+3% win chance per level"},
+            "rapid_analysis": {"name": "Rapid Analysis", "level": 1, "max_level": 10, "cost_base": 10, "effect": "-5% rolls per level"},
+            "perfect_strike": {"name": "Perfect Strike", "level": 1, "max_level": 5, "cost_base": 15, "effect": "15% chance to instantly win"},
+            
+            # Defensive Skills
+            "shield_mind": {"name": "Shield Mind", "level": 1, "max_level": 10, "cost_base": 5, "effect": "+2% error recovery per level"},
+            "stability": {"name": "Stability", "level": 1, "max_level": 10, "cost_base": 7, "effect": "+1% streak preservation per level"},
+            "resilience": {"name": "Resilience", "level": 1, "max_level": 5, "cost_base": 12, "effect": "Second chance on loss (once per session)"},
+            
+            # Economy Skills
+            "profit_master": {"name": "Profit Master", "level": 1, "max_level": 10, "cost_base": 6, "effect": "+5% SP gains per level"},
+            "fortune_finder": {"name": "Fortune Finder", "level": 1, "max_level": 10, "cost_base": 8, "effect": "+3% rare item drop rate per level"},
+            "wealth_accumulation": {"name": "Wealth Accumulation", "level": 1, "max_level": 10, "cost_base": 10, "effect": "+2% multiplier per level"},
+            
+            # Special Skills
+            "legendary_aura": {"name": "Legendary Aura", "level": 1, "max_level": 5, "cost_base": 25, "effect": "Unlock legendary equipment"},
+            "time_mastery": {"name": "Time Mastery", "level": 1, "max_level": 3, "cost_base": 30, "effect": "Slow down time (1 second)"},
+            "chaos_control": {"name": "Chaos Control", "level": 1, "max_level": 3, "cost_base": 35, "effect": "Control sequence difficulty"},
+        }
+        self.skill_points = 10
+        self.total_skill_points_earned = 10
+    
+    def upgrade_skill(self, skill_name):
+        """Upgrade a skill"""
+        if skill_name not in self.skills:
+            return False, "Skill not found"
+        
+        skill = self.skills[skill_name]
+        if skill["level"] >= skill["max_level"]:
+            return False, "Skill already at max level"
+        
+        upgrade_cost = skill["cost_base"] * skill["level"]
+        if self.sp < upgrade_cost:
+            return False, f"Need {upgrade_cost} SP"
+        
+        self.sp -= upgrade_cost
+        skill["level"] += 1
+        self.total_skill_points_earned += 1
+        return True, f"{skill_name} upgraded to level {skill['level']}"
+    
+    
+    def _init_dungeons(self):
+        """Initialize dungeon system"""
+        self.dungeons = {
+            "easy": {"name": "Training Grounds", "boss": "Training Dummy", "hp": 50, "reward": 25, "difficulty": 1.0},
+            "medium": {"name": "Dark Forest", "boss": "Shadow Beast", "hp": 150, "reward": 75, "difficulty": 2.0},
+            "hard": {"name": "Dragon's Lair", "boss": "Ancient Dragon", "hp": 300, "reward": 200, "difficulty": 3.0},
+            "nightmare": {"name": "Abyss", "boss": "Void Entity", "hp": 500, "reward": 500, "difficulty": 5.0},
+        }
+        self.current_dungeon = None
+        self.current_boss_hp = 0
+        self.daily_dungeons_completed = 0
+        self.dungeons_completed_total = 0
+    
+    def enter_dungeon(self, difficulty):
+        """Enter a dungeon"""
+        if difficulty not in self.dungeons:
+            return False, "Dungeon not found"
+        
+        self.current_dungeon = difficulty
+        dungeon = self.dungeons[difficulty]
+        self.current_boss_hp = dungeon["hp"]
+        return True, f"Entered {dungeon['name']}! Boss: {dungeon['boss']} (HP: {dungeon['hp']})"
+    
+    def attack_boss(self, damage):
+        """Attack dungeon boss"""
+        if not self.current_dungeon:
+            return False, "Not in a dungeon"
+        
+        self.current_boss_hp = max(0, self.current_boss_hp - damage)
+        dungeon = self.dungeons[self.current_dungeon]
+        
+        if self.current_boss_hp <= 0:
+            reward = int(dungeon["reward"] * dungeon["difficulty"])
+            self.sp += reward
+            self.dungeons_completed_total += 1
+            self.daily_dungeons_completed += 1
+            result = f"Boss defeated! +{reward} SP!"
+            self.current_dungeon = None
+            return True, result
+        
+        return True, f"Boss HP: {self.current_boss_hp}/{dungeon['hp']}"
+    
+    def _init_marketplace(self):
+        """Initialize player marketplace/trading"""
+        self.marketplace_items = {}
+        self.marketplace_listings = []
+        self.trade_history = []
+    
+    
+    def _init_seasonal_system(self):
+        """Initialize seasonal content"""
+        self.current_season = 1
+        self.season_progress = 0
+        self.season_rewards_claimed = []
+        self.seasonal_challenges = {
+            "win_100": {"name": "Century Wins", "target": 100, "reward": 100, "completed": False},
+            "speedrun": {"name": "Lightning Fast", "target": 5, "reward": 50, "completed": False},
+            "tournament": {"name": "Tournament Champion", "target": 1, "reward": 75, "completed": False},
+            "boss_hunter": {"name": "Boss Slayer", "target": 10, "reward": 100, "completed": False},
+        }
+    
+    def _init_daily_quests(self):
+        """Initialize daily quest system"""
+        self.daily_quests = {
+            "quick_wins": {"name": "Quick Wins", "target": 10, "reward": 20, "progress": 0},
+            "accuracy": {"name": "Accuracy Master", "target": 5, "reward": 15, "progress": 0},
+            "equipment": {"name": "Equipment Crafter", "target": 1, "reward": 25, "progress": 0},
+            "tournament": {"name": "Tournament Play", "target": 1, "reward": 30, "progress": 0},
+            "dungeon": {"name": "Dungeon Explorer", "target": 2, "reward": 25, "progress": 0},
+        }
+        self.quest_completion_date = None
+    
+    def _init_prestige_system(self):
+        """Initialize prestige/advancement system (not rebirth)"""
+        self.prestige_level = 0
+        self.prestige_points = 0
+        self.total_prestige_points_earned = 0
+        self.prestige_unlocks = {}
+    
+    def _init_pvp_system(self):
+        """Initialize PvP battle system"""
+        self.pvp_rating = 1000  # Elo rating
+        self.pvp_wins = 0
+        self.pvp_losses = 0
+        self.pvp_streak = 0
+        self.pvp_opponents = []
+    
+    def _init_collection_system(self):
+        """Initialize collection/trophy system"""
+        self.collection = {
+            "rare_sequences": [],
+            "achievements_earned": [],
+            "equipment_collected": [],
+            "bosses_defeated": [],
+            "tournaments_won": [],
+        }
+    
+    def simulate_pvp_battle(self, opponent_skill=50):
+        """Simulate PvP battle"""
+        player_score = self.wins_count + (self.skill_points * 5)
+        opponent_score = opponent_skill + random.randint(10, 50)
+        
+        if player_score > opponent_score:
+            self.pvp_wins += 1
+            self.pvp_streak += 1
+            self.pvp_rating = min(3000, self.pvp_rating + 25)
+            reward = int(50 * (1 + self.pvp_streak * 0.1))
+            self.sp += reward
+            return True, f"Victory! +{reward} SP! Rating: {self.pvp_rating}"
+        else:
+            self.pvp_losses += 1
+            self.pvp_streak = 0
+            self.pvp_rating = max(800, self.pvp_rating - 15)
+            return False, f"Defeat! Rating: {self.pvp_rating}"
+    
+    def complete_daily_quest(self, quest_name):
+        """Complete a daily quest"""
+        if quest_name not in self.daily_quests:
+            return False, "Quest not found"
+        
+        quest = self.daily_quests[quest_name]
+        if quest["progress"] >= quest["target"]:
+            return False, "Quest already complete"
+        
+        quest["progress"] += 1
+        if quest["progress"] >= quest["target"]:
+            self.sp += quest["reward"]
+            return True, f"Quest complete! +{quest['reward']} SP!"
+        
+        return True, f"{quest['name']}: {quest['progress']}/{quest['target']}"
+    
+    def _init_cosmetics(self):
+        """Initialize cosmetic system"""
+        self.cosmetics = {
+            "themes": ["Dark", "Light", "Matrix", "Neon", "Forest", "Ocean"],
+            "current_theme": "Dark",
+            "titles": ["Novice", "Adept", "Expert", "Master", "Legend", "Mythic"],
+            "current_title": "Novice",
+            "particles": ["none", "stars", "fire", "ice", "lightning"],
+            "current_particles": "none",
+        }
+
+    def _init_guilds(self):
+        """Initialize guild system"""
+        self.guilds = {}
+        self.current_guild = None
+        self.guild_level = 0
+        self.guild_contribution = 0
+
+    def earn_skill_points(self, amount=1):
+        """Earn skill points from tournaments/achievements"""
+        self.skill_points += amount
+        self.total_skill_points_earned += amount
+
+    def participate_in_tournament(self, tournament_name):
+        """Start a tournament"""
+        if tournament_name not in self.tournaments:
+            return False, "Tournament not found"
+        
+        tournament = self.tournaments[tournament_name]
+        if not tournament["active"]:
+            return False, "Tournament is not active"
+        
+        self.current_tournament = tournament_name
+        self.tournament_round = 0
+        self.tournament_wins = 0
+        return True, f"Joined {tournament['name']}!"
+    
+    def complete_tournament_round(self, rounds_taken):
+        """Complete a tournament round"""
+        if not self.current_tournament:
+            return None
+        
+        tournament = self.tournaments[self.current_tournament]
+        self.tournament_round += 1
+        
+        # Calculate points based on tournament type
+        if tournament["type"] == "speed":
+            points = max(0, 100 - rounds_taken * 2)
+        elif tournament["type"] == "accuracy":
+            points = 50 + self.roll_count
+        elif tournament["type"] == "endurance":
+            points = 100 + (self.tournament_round * 10)
+        else:
+            points = 50 + (tournament["difficulty_multiplier"] * 10)
+        
+        self.tournament_scores[self.current_tournament] += points
+        self.tournament_wins += 1
+        
+        # Check if tournament complete
+        if self.tournament_round >= tournament["rounds"]:
+            reward = int(tournament["prize"] * tournament["difficulty_multiplier"])
+            self.sp += reward
+            result = f"Tournament Complete! +{reward} SP!"
+            self.current_tournament = None
+            return result
+        
+        return f"Round {self.tournament_round}/{tournament['rounds']} - +{points} pts"
+
     def _init_april_fools_pranks(self):
         """Initialize April Fools pranks"""
         self.pranks = {
@@ -650,10 +993,22 @@ class RollingGame:
         view_menu.add_command(label="Achievements", command=self.show_achievements_window)
         view_menu.add_command(label="Leaderboard", command=self.show_leaderboard)
         
+        # Systems menu - NEW!
+        systems_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Systems", menu=systems_menu)
+        systems_menu.add_command(label="💪 Skill Tree", command=self.show_skill_tree_screen)
+        systems_menu.add_command(label="🏆 Tournaments", command=self.show_tournament_screen)
+        systems_menu.add_command(label="🐉 Dungeons", command=self.show_dungeon_screen)
+        systems_menu.add_command(label="⚔️ PvP Battles", command=self.show_pvp_screen)
+        systems_menu.add_separator()
+        systems_menu.add_command(label="📊 Prestige", command=lambda: messagebox.showinfo("Prestige", f"Prestige Level: {self.prestige_level}\nTotal Points: {self.total_prestige_points_earned}"))
+        systems_menu.add_command(label="⚡ Seasonal", command=lambda: messagebox.showinfo("Seasonal", f"Season: {self.current_season}\nProgress: {self.season_progress}"))
+
+        
         # Tools menu
         tools_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Tools", menu=tools_menu)
-        tools_menu.add_command(label="Settings", command=self.show_settings_window)
+        tools_menu.add_command(label="⚙️ Settings", command=self.show_settings_screen)
         tools_menu.add_command(label="Equipment Crafting", command=self.show_equipment_window)
         tools_menu.add_command(label="Mini-Game", command=self.play_mini_game)
         tools_menu.add_command(label="Tutorial", command=self.start_tutorial)
@@ -1129,13 +1484,28 @@ class RollingGame:
             "roll_count": self.roll_count,
             "wins_count": self.wins_count,
             "target_properties": list(self.target_properties),
-            "rolls_history": self.rolls_history[-100:],  # Save last 100 rolls
+            "rolls_history": self.rolls_history[-100:],
             "achievements": self.achievements,
             "stats": self.stats,
             "theme": self.current_theme,
             "sound_enabled": self.sound_enabled,
             "animations_enabled": self.animations_enabled,
-            "difficulty": self.difficulty
+            "difficulty": self.difficulty,
+            # NEW SYSTEMS
+            "autoroll_speed": self.autoroll_speed,
+            "skills": self.skills,
+            "skill_points": self.skill_points,
+            "tournament_scores": self.tournament_scores,
+            "pvp_rating": self.pvp_rating,
+            "pvp_wins": self.pvp_wins,
+            "pvp_losses": self.pvp_losses,
+            "prestige_level": self.prestige_level,
+            "prestige_points": self.prestige_points,
+            "dungeons_completed_total": self.dungeons_completed_total,
+            "daily_dungeons_completed": self.daily_dungeons_completed,
+            "current_season": self.current_season,
+            "seasonal_challenges": self.seasonal_challenges,
+            "daily_quests": self.daily_quests,
         }
         
         filename = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")])
@@ -1165,6 +1535,21 @@ class RollingGame:
                 self.sound_enabled = game_state.get("sound_enabled", True)
                 self.animations_enabled = game_state.get("animations_enabled", True)
                 self.difficulty = game_state.get("difficulty", "normal")
+                # NEW SYSTEMS
+                self.autoroll_speed = game_state.get("autoroll_speed", 100)
+                self.skills = game_state.get("skills", self.skills)
+                self.skill_points = game_state.get("skill_points", 10)
+                self.tournament_scores = game_state.get("tournament_scores", self.tournament_scores)
+                self.pvp_rating = game_state.get("pvp_rating", 1000)
+                self.pvp_wins = game_state.get("pvp_wins", 0)
+                self.pvp_losses = game_state.get("pvp_losses", 0)
+                self.prestige_level = game_state.get("prestige_level", 0)
+                self.prestige_points = game_state.get("prestige_points", 0)
+                self.dungeons_completed_total = game_state.get("dungeons_completed_total", 0)
+                self.daily_dungeons_completed = game_state.get("daily_dungeons_completed", 0)
+                self.current_season = game_state.get("current_season", 1)
+                self.seasonal_challenges = game_state.get("seasonal_challenges", self.seasonal_challenges)
+                self.daily_quests = game_state.get("daily_quests", self.daily_quests)
                 
                 # Update UI
                 self.roll_label.config(text=str(self.roll_count))
@@ -1416,6 +1801,228 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
             return "Adept"
         return "Novice"
     
+    def show_settings_screen(self):
+        """Show comprehensive settings screen with auto-roll speed control"""
+        settings_window = tk.Toplevel(self.root)
+        settings_window.title("⚙️ Settings")
+        settings_window.geometry("500x700")
+        settings_window.config(bg="#1a1a1a")
+        
+        title = tk.Label(settings_window, text="⚙️ GAME SETTINGS", font=("Arial", 14, "bold"), fg="#00ff00", bg="#1a1a1a")
+        title.pack(pady=10)
+        
+        # Auto-roll Speed Control
+        speed_frame = tk.Frame(settings_window, bg="#2a2a2a")
+        speed_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        speed_label = tk.Label(speed_frame, text="🎲 Auto-Roll Speed (No Delay!)", font=("Arial", 11, "bold"), fg="#00ff00", bg="#2a2a2a")
+        speed_label.pack(anchor=tk.W)
+        
+        speed_info = tk.Label(speed_frame, text=f"Current: {self.autoroll_speed}ms | Range: {self.autoroll_min_speed}-{self.autoroll_max_speed}ms", 
+                             font=("Arial", 9), fg="#888", bg="#2a2a2a")
+        speed_info.pack(anchor=tk.W)
+        
+        def update_speed(val):
+            self.autoroll_speed = int(float(val))
+            speed_info.config(text=f"Current: {self.autoroll_speed}ms | Range: {self.autoroll_min_speed}-{self.autoroll_max_speed}ms")
+        
+        speed_slider = tk.Scale(speed_frame, from_=self.autoroll_min_speed, to=self.autoroll_max_speed, 
+                               orient=tk.HORIZONTAL, bg="#3a3a3a", fg="#00ff00", command=update_speed)
+        speed_slider.set(self.autoroll_speed)
+        speed_slider.pack(fill=tk.X)
+        
+        # Skill Points Display
+        skill_frame = tk.Frame(settings_window, bg="#2a2a2a")
+        skill_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        tk.Label(skill_frame, text="💪 Skill Tree Overview", font=("Arial", 11, "bold"), fg="#00ff00", bg="#2a2a2a").pack(anchor=tk.W)
+        
+        skill_text = f"Total Skills: {len(self.skills)}\n"
+        for skill_name, skill in list(self.skills.items())[:5]:
+            skill_text += f"  • {skill['name']}: Lvl {skill['level']}/{skill['max_level']}\n"
+        skill_text += f"  ... ({len(self.skills)-5} more skills)"
+        
+        tk.Label(skill_frame, text=skill_text, font=("Arial", 9), fg="#aaa", bg="#2a2a2a", justify=tk.LEFT).pack(anchor=tk.W)
+        
+        # Tournament Status
+        tournament_frame = tk.Frame(settings_window, bg="#2a2a2a")
+        tournament_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        tk.Label(tournament_frame, text="🏆 Tournament Status", font=("Arial", 11, "bold"), fg="#00ff00", bg="#2a2a2a").pack(anchor=tk.W)
+        
+        tour_text = f"Active Tournaments: {len([t for t in self.tournaments.values() if t['active']])}\n"
+        tour_text += f"PvP Rating: {self.pvp_rating}\n"
+        tour_text += f"Current Streak: {self.pvp_streak}"
+        
+        tk.Label(tournament_frame, text=tour_text, font=("Arial", 9), fg="#aaa", bg="#2a2a2a", justify=tk.LEFT).pack(anchor=tk.W)
+        
+        # Dungeon Progress
+        dungeon_frame = tk.Frame(settings_window, bg="#2a2a2a")
+        dungeon_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        tk.Label(dungeon_frame, text="🐉 Dungeon Progress", font=("Arial", 11, "bold"), fg="#00ff00", bg="#2a2a2a").pack(anchor=tk.W)
+        
+        dungeon_text = f"Dungeons Completed: {self.dungeons_completed_total}\n"
+        dungeon_text += f"Daily Completed: {self.daily_dungeons_completed}\n"
+        dungeon_text += f"Current Prestige Level: {self.prestige_level}"
+        
+        tk.Label(dungeon_frame, text=dungeon_text, font=("Arial", 9), fg="#aaa", bg="#2a2a2a", justify=tk.LEFT).pack(anchor=tk.W)
+        
+        close_btn = tk.Button(settings_window, text="✓ Close Settings", command=settings_window.destroy, 
+                            bg="#00ff00", fg="#000", font=("Arial", 10, "bold"))
+        close_btn.pack(pady=10)
+
+    def show_skill_tree_screen(self):
+        """Display skill tree interface"""
+        tree_window = tk.Toplevel(self.root)
+        tree_window.title("💪 Skill Tree")
+        tree_window.geometry("600x700")
+        tree_window.config(bg="#1a1a1a")
+        
+        title = tk.Label(tree_window, text="💪 SKILL TREE", font=("Arial", 14, "bold"), fg="#00ff00", bg="#1a1a1a")
+        title.pack(pady=10)
+        
+        canvas = tk.Canvas(tree_window, bg="#1a1a1a", highlightthickness=0)
+        scrollbar = tk.Scrollbar(tree_window, orient=tk.VERTICAL, command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg="#1a1a1a")
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        for skill_name, skill in self.skills.items():
+            skill_frame = tk.Frame(scrollable_frame, bg="#2a2a2a")
+            skill_frame.pack(fill=tk.X, padx=10, pady=3)
+            
+            info = f"{skill['name']} Lvl {skill['level']}/{skill['max_level']} | {skill['effect']}"
+            tk.Label(skill_frame, text=info, font=("Arial", 9), fg="#aaa", bg="#2a2a2a").pack(anchor=tk.W, padx=5)
+            
+            def upgrade_callback(s=skill_name):
+                success, msg = self.upgrade_skill(s)
+                messagebox.showinfo("Skill Upgrade", msg)
+                if success:
+                    tree_window.destroy()
+                    self.show_skill_tree_screen()
+            
+            upgrade_btn = tk.Button(skill_frame, text=f"Upgrade ({skill['cost_base'] * skill['level']} SP)", 
+                                  command=upgrade_callback, bg="#666", fg="#fff", font=("Arial", 8))
+            upgrade_btn.pack(anchor=tk.W, padx=5)
+        
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def show_tournament_screen(self):
+        """Display tournament selection and participation"""
+        tournament_window = tk.Toplevel(self.root)
+        tournament_window.title("🏆 Tournaments")
+        tournament_window.geometry("700x600")
+        tournament_window.config(bg="#1a1a1a")
+        
+        title = tk.Label(tournament_window, text="🏆 TOURNAMENTS", font=("Arial", 14, "bold"), fg="#00ff00", bg="#1a1a1a")
+        title.pack(pady=10)
+        
+        canvas = tk.Canvas(tournament_window, bg="#1a1a1a", highlightthickness=0)
+        scrollbar = tk.Scrollbar(tournament_window, orient=tk.VERTICAL, command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg="#1a1a1a")
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        for t_name, tournament in self.tournaments.items():
+            t_frame = tk.Frame(scrollable_frame, bg="#2a2a2a")
+            t_frame.pack(fill=tk.X, padx=10, pady=5)
+            
+            header = tk.Label(t_frame, text=f"{tournament['name']} - {tournament['desc']}", 
+                            font=("Arial", 10, "bold"), fg="#00ff00", bg="#2a2a2a")
+            header.pack(anchor=tk.W, padx=5, pady=3)
+            
+            stats = f"Rounds: {tournament['rounds']} | Reward: {tournament['prize']} SP | Type: {tournament['type'].upper()}"
+            tk.Label(t_frame, text=stats, font=("Arial", 9), fg="#aaa", bg="#2a2a2a").pack(anchor=tk.W, padx=15)
+            
+            score_text = f"Your Score: {self.tournament_scores.get(t_name, 0)}"
+            tk.Label(t_frame, text=score_text, font=("Arial", 9), fg="#00ff00", bg="#2a2a2a").pack(anchor=tk.W, padx=15)
+            
+            def join_callback(tn=t_name):
+                success, msg = self.participate_in_tournament(tn)
+                messagebox.showinfo("Tournament", msg)
+            
+            join_btn = tk.Button(t_frame, text="▶ Join Tournament", command=join_callback, 
+                               bg="#ff6600", fg="#000", font=("Arial", 9, "bold"))
+            join_btn.pack(anchor=tk.W, padx=15, pady=3)
+        
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def show_dungeon_screen(self):
+        """Display dungeon interface"""
+        dungeon_window = tk.Toplevel(self.root)
+        dungeon_window.title("🐉 Dungeons")
+        dungeon_window.geometry("500x500")
+        dungeon_window.config(bg="#1a1a1a")
+        
+        title = tk.Label(dungeon_window, text="🐉 DUNGEONS", font=("Arial", 14, "bold"), fg="#00ff00", bg="#1a1a1a")
+        title.pack(pady=10)
+        
+        for difficulty, dungeon in self.dungeons.items():
+            d_frame = tk.Frame(dungeon_window, bg="#2a2a2a")
+            d_frame.pack(fill=tk.X, padx=10, pady=10)
+            
+            header = tk.Label(d_frame, text=f"{dungeon['name']} - {dungeon['boss']}", 
+                            font=("Arial", 10, "bold"), fg="#ff6600", bg="#2a2a2a")
+            header.pack(anchor=tk.W, padx=5, pady=3)
+            
+            stats = f"Boss HP: {dungeon['hp']} | Reward: {dungeon['reward']} SP | Difficulty: {dungeon['difficulty']}x"
+            tk.Label(d_frame, text=stats, font=("Arial", 9), fg="#aaa", bg="#2a2a2a").pack(anchor=tk.W, padx=15)
+            
+            def enter_callback(diff=difficulty):
+                success, msg = self.enter_dungeon(diff)
+                messagebox.showinfo("Dungeon", msg)
+            
+            enter_btn = tk.Button(d_frame, text="⚔️ Enter Dungeon", command=enter_callback, 
+                                bg="#ff0000", fg="#fff", font=("Arial", 9, "bold"))
+            enter_btn.pack(anchor=tk.W, padx=15, pady=3)
+
+    def show_pvp_screen(self):
+        """Display PvP battle interface"""
+        pvp_window = tk.Toplevel(self.root)
+        pvp_window.title("⚔️ PvP Battles")
+        pvp_window.geometry("500x400")
+        pvp_window.config(bg="#1a1a1a")
+        
+        title = tk.Label(pvp_window, text="⚔️ PvP BATTLES", font=("Arial", 14, "bold"), fg="#00ff00", bg="#1a1a1a")
+        title.pack(pady=10)
+        
+        stats_frame = tk.Frame(pvp_window, bg="#2a2a2a")
+        stats_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        stats_text = f"Rating: {self.pvp_rating}\nWins: {self.pvp_wins} | Losses: {self.pvp_losses}\nStreak: {self.pvp_streak}"
+        tk.Label(stats_frame, text=stats_text, font=("Arial", 10), fg="#00ff00", bg="#2a2a2a").pack(anchor=tk.W)
+        
+        opponent_frame = tk.Frame(pvp_window, bg="#2a2a2a")
+        opponent_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        tk.Label(opponent_frame, text="Find an Opponent", font=("Arial", 11, "bold"), fg="#00ff00", bg="#2a2a2a").pack(anchor=tk.W, pady=5)
+        
+        def simulate_battle():
+            opponent_skill = random.randint(40, 80)
+            result, msg = self.simulate_pvp_battle(opponent_skill)
+            messagebox.showinfo("PvP Battle", msg)
+            pvp_window.destroy()
+            self.show_pvp_screen()
+        
+        battle_btn = tk.Button(opponent_frame, text="⚡ Battle!", command=simulate_battle, 
+                             bg="#ff0000", fg="#fff", font=("Arial", 11, "bold"), height=2)
+        battle_btn.pack(fill=tk.X)
+
     def toggle_dev_console(self):
         """Toggle developer console - v1.67 Feature (Ctrl+Shift+D)"""
         self.dev_console_open = not self.dev_console_open
