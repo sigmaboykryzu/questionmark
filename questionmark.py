@@ -257,18 +257,18 @@ class RollingGame:
             self.john_pork_elixir["count"] += 1
             self.sp += 67  # John Pork Elixir bonus
             self.troll_level += 2
-            return "🐰 CHOCOLATE BUNNY FOUND! +67 SP! 🐰"
+            return "🐰 YO THIS CHOCOLATE BUNNY BUSSIN! +67 SP OMEGA TUFF! LLOLOLOL 🐰"
         
         easter_eggs = {
-            "QUESTIONMARK": "🎪 YOU FOUND THE MASTER EGG! 🎪",
-            "APRILFOOLS": "🃏 The Trickster smiles... 🃏",
-            "ROLLINGGAME": "🎲 Rolling in the deep... 🎲",
-            "TROLL": "👹 Troll mode activated! 👹",
-            "CHAOS": "⚡ CHAOS MODE UNLOCKED ⚡",
-            "SECRET": "🔐 Hidden secrets revealed! 🔐",
-            "CHEAT": "💀 Cheater! (But I won't tell) 💀",
-            "HIDDEN": "👁️ All seeing eye mode 👁️",
-            "JOHNPORK": "🍗 JOHN PORK POWER! +67 SP! 🍗",
+            "QUESTIONMARK": "🎪 YO THIS PEAK RIZZ ENERGY! SUPER BUSSIN! 🎪",
+            "APRILFOOLS": "🃏 OGMGMGMGM THE TRICKSTER RIZZ EXTREME! 🃏",
+            "ROLLINGGAME": "🎲 DUPER COOL ROLLING EZZZ VIBES! 🎲",
+            "TROLL": "👹 ULTRA TROLL MODE ACTIVATED! BUSSIN! 👹",
+            "CHAOS": "⚡ OMEGA CHAOS MODE UNLOCKED TUFF! ⚡",
+            "SECRET": "🔐 PEAK SECRET VIBES REVEALED EZZZ! 🔐",
+            "CHEAT": "💀 YO CHEATER RIZZ! (WE NOT SNITCHING THO) 💀",
+            "HIDDEN": "👁️ DUPER EXTREME ALL SEEING BUSSIN MODE! 👁️",
+            "JOHNPORK": "🍗 JOHN PORK ULTRA POWER! +67 SP EZZZ! BUSSIN! 🍗",
         }
         
         if code.upper() in easter_eggs:
@@ -1316,11 +1316,11 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
             return
         
         self.dev_win = tk.Toplevel(self.root)
-        self.dev_win.title("🔧 Developer Console - v1.67")
+        self.dev_win.title("🔧 v1.67 BUSSIN DEV CONSOLE - ULTRA TUFF EZZZ")
         self.dev_win.geometry("600x400")
         self.dev_win.configure(bg="#0a0a0a")
         
-        tk.Label(self.dev_win, text="Developer Console", font=("Courier", 12, "bold"),
+        tk.Label(self.dev_win, text="v1.67 BUSSIN DEV CONSOLE - PEAK RIZZ", font=("Courier", 12, "bold"),
                 bg="#0a0a0a", fg="#00ff00").pack(pady=5)
         
         # Command input
@@ -1337,14 +1337,14 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
         output.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Show help
-        help_text = """Available Dev Commands:
-  add_sp <amount> - Add SP
-  add_win - Add a win
-  set_mode <classic/speedrun/hardcore> - Change mode
-  easter_egg <code> - Trigger easter egg
-  facebook - Enable Facebook test mode
-  version - Show version info
-  help - Show this help
+        help_text = """BUSSIN v1.67 DEV COMMANDS - EZZZ MODE:
+  add_sp <amount> - Add SP (SUPER TUFF)
+  add_win - Add a win (DUPER COOL)
+  set_mode <classic/speedrun/hardcore> - PEAK MODE (ULTRA)
+  easter_egg <code> - Trigger BUSSIN egg (EXTREME)
+  facebook - Enable BUSSIN Facebook mode (OGMGMGMGM)
+  version - v1.67 BUSSIN UPDATE
+  help - Show this RIZZ help
 """
         output.insert(tk.END, help_text)
         output.config(state=tk.DISABLED)
@@ -1359,17 +1359,17 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
                     parts = cmd.split()
                     amount = int(parts[1]) if len(parts) > 1 else 10
                     self.sp += amount
-                    output.insert(tk.END, f"\n✓ Added {amount} SP (Total: {self.sp})")
+                    output.insert(tk.END, f"\n✓ YO BUSSIN! Added {amount} SP - ULTRA TUFF! (Total: {self.sp})")
                 elif cmd == "add_win":
                     self.wins_count += 1
-                    output.insert(tk.END, f"\n✓ Added win (Total: {self.wins_count})")
+                    output.insert(tk.END, f"\n✓ PEAK WIN ADDED! EZZZ MODE! (Total: {self.wins_count})")
                 elif cmd.startswith("set_mode"):
                     parts = cmd.split()
                     if len(parts) > 1:
                         self.current_mode = parts[1].capitalize()
-                        output.insert(tk.END, f"\n✓ Mode set to {self.current_mode}")
+                        output.insert(tk.END, f"\n✓ DUPER COOL MODE! {self.current_mode} BUSSIN ACTIVATED!")
                     else:
-                        output.insert(tk.END, "\n✗ Usage: set_mode <classic/speedrun/hardcore>")
+                        output.insert(tk.END, "\n✗ YO USE: set_mode <classic/speedrun/hardcore> - TUFF")
                 elif cmd.startswith("easter_egg"):
                     parts = cmd.split(maxsplit=1)
                     if len(parts) > 1:
@@ -1380,15 +1380,15 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
                         output.insert(tk.END, "\n✗ Usage: easter_egg <code>")
                 elif cmd == "facebook":
                     self.facebook_test_mode = True
-                    output.insert(tk.END, "\n✓ Facebook test mode enabled")
+                    output.insert(tk.END, "\n✓ OGMGMGMGM FACEBOOK BUSSIN MODE ENABLED! ULTRA RIZZ!")
                 elif cmd == "version":
-                    output.insert(tk.END, "\nv1.67 April Fools + Restoration")
+                    output.insert(tk.END, "\nv1.67 BUSSIN APRIL FOOLS UPDATE - PEAK RIZZ! EZZZ! 67!")
                 elif cmd == "help":
                     output.insert(tk.END, help_text)
                 else:
-                    output.insert(tk.END, "\n✗ Unknown command")
+                    output.insert(tk.END, "\n✗ YO THAT COMMAND NOT BUSSIN BRO! LLOLOLOL")
             except Exception as e:
-                output.insert(tk.END, f"\n✗ Error: {e}")
+                output.insert(tk.END, f"\n✗ YO ERROR TUFF! {e} - NOT BUSSIN!")
             
             output.see(tk.END)
             output.config(state=tk.DISABLED)
