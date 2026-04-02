@@ -97,7 +97,78 @@ class AccountManager:
 
 class RollingGame:
     
-    def _init_equipment_recipes(self):
+    def __init__(self, username=None):
+        """Initialize the game with player username"""
+        self.current_username = username
+        self.account_manager = AccountManager()
+        
+        # Game state
+        self.wins_count = 0
+        self.roll_count = 0
+        self.winning_streak = 0
+        self.auto_rolling = False
+        
+        # Currency and resources
+        self.sp = 0
+        self.sp_plus = 0
+        self.sp_x = 0
+        self.sp_caret = 0
+        self.reroll_tokens = 0
+        self.reroll_uses = 0
+        
+        # RNG System
+        self.luck_percentage = 10
+        self.pity_loss_counter = 0
+        
+        # Progressive Mechanics
+        self.progressive_mechanics = {}
+        self.player_level = 1
+        
+        # Systems Interaction
+        self.system_synergies = {
+            "equipment_power": 0,
+            "combat_efficiency": 0,
+            "economy_multiplier": 1.0,
+            "total_synergy": 1.0
+        }
+        
+        # Game data
+        self.target_properties = []
+        self.rolls_history = []
+        self.stats = {
+            'property_discoveries': {},
+            'fastest_win': float('inf'),
+            'slowest_win': 0,
+            'current_streak': 0,
+            'best_streak': 0,
+            'total_rolls': 0,
+            'total_wins': 0,
+            'player_level': 1
+        }
+        self.challenge_progress = {}
+        self.inventory = {}
+        self.equipment_recipes = {}
+        self.abilities = {}
+        self.achievements = {}
+        
+        # Initialize systems
+        self._init_equipment_recipes()
+        self._init_progressive_mechanics()
+        self._init_systems_interaction()
+        
+        # Load user data
+        self._load_equipment()
+        self._load_challenge_progress()
+        self._load_stats()
+        self._load_achievements()
+        self._load_rng_data()
+        
+        # Setup GUI
+        self._setup_gui()
+        self._next_sequence()
+    
+    def _init_progressive_mechanics(self):
+        """Initialize progressive mechanics system"""
         """Initialize equipment crafting recipes"""
         self.equipment_recipes = {
             "iron_gauntlet": {"type": "gauntlet", "cost": {"sp": 3}, "effect": "roll_count - 1", "desc": "Reduce rolls by 1"},
