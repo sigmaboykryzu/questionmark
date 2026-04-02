@@ -107,6 +107,9 @@ class RollingGame:
         self.roll_count = 0
         self.winning_streak = 0
         self.auto_rolling = False
+        self.rolls_history = []
+        self.target_properties = []
+        self.difficulty = "normal"  # easy, normal, hard, extreme
         
         # Currency and resources
         self.sp = 0
@@ -133,8 +136,6 @@ class RollingGame:
         }
         
         # Game data
-        self.target_properties = []
-        self.rolls_history = []
         self.stats = {
             'property_discoveries': {},
             'fastest_win': float('inf'),
@@ -151,22 +152,11 @@ class RollingGame:
         self.abilities = {}
         self.achievements = {}
         
-        # Initialize systems
-        self._init_equipment_recipes()
-        self._init_progressive_mechanics()
-        self._init_systems_interaction()
-        
-        # Load user data
-        self._load_equipment()
-        self._load_challenge_progress()
-        self._load_stats()
-        self._load_achievements()
-        self._load_rng_data()
-        
-        # Setup GUI
+        # Setup GUI first
         self._setup_gui()
         self._next_sequence()
     
+
     def _init_progressive_mechanics(self):
         """Initialize progressive mechanics system"""
         """Initialize equipment crafting recipes"""
