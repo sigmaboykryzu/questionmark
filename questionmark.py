@@ -135,6 +135,7 @@ class RollingGame:
         self.version_1_67_mode = self._check_april_fools_or_v167_mode()
         self.v167_equipment_unlocked = self.version_1_67_mode
         self.purple_text_property = self.version_1_67_mode  # Purple text property active on April Fools
+        self._init_april_fools_pranks()  # Initialize pranks before daily challenges
         
         # Daily Challenge System (AFTER v1.67 mode is set)
         self.daily_challenges = self._init_daily_challenges()
@@ -231,7 +232,6 @@ class RollingGame:
         if not self.april_fools_active or random.random() > 0.15:
             return None
         
-        import random
         prank_list = list(self.pranks.keys())
         selected_prank = random.choice(prank_list)
         self.pranks[selected_prank]["active"] = True
