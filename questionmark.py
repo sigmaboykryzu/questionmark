@@ -402,6 +402,25 @@ class RollingGame:
                                      command=self.quit_game, width=15)
         self.quit_button.pack(side=tk.LEFT, padx=5)
         
+        # NEW SYSTEM WINDOWS BUTTONS
+        self.rng_button = tk.Button(button_frame, text="🍀 RNG", font=("Arial", 11, "bold"),
+                                    bg="#99cc00", fg="#000000", padx=15, pady=10,
+                                    activebackground="#99cc00", activeforeground="#000000",
+                                    command=self.show_rng_control_window, width=12)
+        self.rng_button.pack(side=tk.LEFT, padx=5)
+        
+        self.mechanics_button = tk.Button(button_frame, text="📈 Mechanics", font=("Arial", 11, "bold"),
+                                          bg="#cc9900", fg="#000000", padx=15, pady=10,
+                                          activebackground="#cc9900", activeforeground="#000000",
+                                          command=self.show_progressive_mechanics_window, width=12)
+        self.mechanics_button.pack(side=tk.LEFT, padx=5)
+        
+        self.synergy_button = tk.Button(button_frame, text="🔗 Synergy", font=("Arial", 11, "bold"),
+                                        bg="#9966cc", fg="#ffffff", padx=15, pady=10,
+                                        activebackground="#9966cc", activeforeground="#ffffff",
+                                        command=self.show_systems_synergy_window, width=12)
+        self.synergy_button.pack(side=tk.LEFT, padx=5)
+        
         # Info text
         info = tk.Label(self.root, text="Deduce the hidden properties by analyzing roll results. Adjust difficulty in settings. Auto-roll unlocks at 500 rolls.",
                        font=("Arial", 10), bg="#2b2b2b", fg="#cccccc")
@@ -1515,7 +1534,20 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
             elif sp_type == "sp_caret":
                 self.sp_caret += 1
             
+            # INTEGRATE SYNERGY SYSTEM: Apply synergy multiplier to SP rewards
+            synergy_mult = self.get_synergy_multiplier()
+            if synergy_mult > 1.0 and sp_type == "sp":
+                bonus_sp = int((synergy_mult - 1.0) * self.sp)
+                self.sp += bonus_sp
+            
             self._update_sp_label()
+            
+            # INTEGRATE SYSTEMS INTERACTION: Process win effects
+            self.apply_systems_interaction_on_win(1)  # Track win for economy multiplier
+            
+            # INTEGRATE PROGRESSIVE MECHANICS: Check for level-up unlocks
+            if 'player_level' in self.__dict__:
+                self._update_progressive_mechanics()
             
             # Update daily challenges and get rewards
             challenge_rewards = self._update_challenges(sp_type, len(s))
@@ -1539,6 +1571,11 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
             
             # Generate new target after 2 seconds
             self.root.after(2000, self._next_sequence)
+        else:
+            # Loss - did not match target properties
+            self.stats['current_streak'] = 0
+            self.apply_systems_interaction_on_loss()  # Track loss for pity counter
+
     
     def toggle_auto_roll(self):
         """Toggle auto-roll"""
