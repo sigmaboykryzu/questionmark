@@ -152,6 +152,11 @@ class RollingGame:
         self.pranks_triggered = []
         self.easter_eggs_found = 0
         self.troll_level = 0
+        
+        # v1.67 Special Items & Features
+        self.john_pork_elixir = {"count": 0, "sp_boost": 67}
+        self.facebook_test_mode = False
+        self.dev_console_open = False
 
         
         # Analytics
@@ -246,6 +251,14 @@ class RollingGame:
     
     def find_easter_egg(self, code):
         """Hidden Easter Egg system"""
+        # v1.67 Special: Chocolate Bunny
+        if code.upper() == "CHOCOLATE" or code.upper() == "CHOCOLATEBUNNY":
+            self.easter_eggs_found += 1
+            self.john_pork_elixir["count"] += 1
+            self.sp += 67  # John Pork Elixir bonus
+            self.troll_level += 2
+            return "🐰 CHOCOLATE BUNNY FOUND! +67 SP! 🐰"
+        
         easter_eggs = {
             "QUESTIONMARK": "🎪 YOU FOUND THE MASTER EGG! 🎪",
             "APRILFOOLS": "🃏 The Trickster smiles... 🃏",
@@ -255,11 +268,16 @@ class RollingGame:
             "SECRET": "🔐 Hidden secrets revealed! 🔐",
             "CHEAT": "💀 Cheater! (But I won't tell) 💀",
             "HIDDEN": "👁️ All seeing eye mode 👁️",
+            "JOHNPORK": "🍗 JOHN PORK POWER! +67 SP! 🍗",
         }
         
         if code.upper() in easter_eggs:
             self.easter_eggs_found += 1
             self.troll_level += 1
+            # John Pork bonus
+            if code.upper() == "JOHNPORK":
+                self.john_pork_elixir["count"] += 1
+                self.sp += 67
             return easter_eggs[code.upper()]
         return None
     
@@ -491,6 +509,9 @@ class RollingGame:
         self.root.title("Questionmark")
         self.root.geometry("900x750")
         self.root.configure(bg="#2b2b2b")
+        
+        # Developer Console Hotkey (v1.67)
+        self.root.bind('<Control-Shift-d>', lambda e: self.toggle_dev_console())
         
         # Menu bar
         menubar = tk.Menu(self.root)
@@ -1278,6 +1299,106 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours
         elif wins >= 5:
             return "Adept"
         return "Novice"
+    
+    def toggle_dev_console(self):
+        """Toggle developer console - v1.67 Feature (Ctrl+Shift+D)"""
+        self.dev_console_open = not self.dev_console_open
+        if self.dev_console_open:
+            self.show_dev_console()
+        else:
+            if hasattr(self, 'dev_win') and self.dev_win.winfo_exists():
+                self.dev_win.destroy()
+    
+    def show_dev_console(self):
+        """Show developer console window"""
+        if hasattr(self, 'dev_win') and self.dev_win.winfo_exists():
+            self.dev_win.lift()
+            return
+        
+        self.dev_win = tk.Toplevel(self.root)
+        self.dev_win.title("🔧 Developer Console - v1.67")
+        self.dev_win.geometry("600x400")
+        self.dev_win.configure(bg="#0a0a0a")
+        
+        tk.Label(self.dev_win, text="Developer Console", font=("Courier", 12, "bold"),
+                bg="#0a0a0a", fg="#00ff00").pack(pady=5)
+        
+        # Command input
+        cmd_frame = tk.Frame(self.dev_win, bg="#0a0a0a")
+        cmd_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        tk.Label(cmd_frame, text=">", bg="#0a0a0a", fg="#00ff00", font=("Courier", 10)).pack(side=tk.LEFT)
+        cmd_entry = tk.Entry(cmd_frame, bg="#1a1a1a", fg="#00ff00", font=("Courier", 10))
+        cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Output area
+        output = scrolledtext.ScrolledText(self.dev_win, bg="#0a0a0a", fg="#00ff00",
+                                          font=("Courier", 9), height=15)
+        output.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Show help
+        help_text = """Available Dev Commands:
+  add_sp <amount> - Add SP
+  add_win - Add a win
+  set_mode <classic/speedrun/hardcore> - Change mode
+  easter_egg <code> - Trigger easter egg
+  facebook - Enable Facebook test mode
+  version - Show version info
+  help - Show this help
+"""
+        output.insert(tk.END, help_text)
+        output.config(state=tk.DISABLED)
+        
+        def execute_command():
+            cmd = cmd_entry.get().strip()
+            output.config(state=tk.NORMAL)
+            output.insert(tk.END, f"\n> {cmd}")
+            
+            try:
+                if cmd.startswith("add_sp"):
+                    parts = cmd.split()
+                    amount = int(parts[1]) if len(parts) > 1 else 10
+                    self.sp += amount
+                    output.insert(tk.END, f"\n✓ Added {amount} SP (Total: {self.sp})")
+                elif cmd == "add_win":
+                    self.wins_count += 1
+                    output.insert(tk.END, f"\n✓ Added win (Total: {self.wins_count})")
+                elif cmd.startswith("set_mode"):
+                    parts = cmd.split()
+                    if len(parts) > 1:
+                        self.current_mode = parts[1].capitalize()
+                        output.insert(tk.END, f"\n✓ Mode set to {self.current_mode}")
+                    else:
+                        output.insert(tk.END, "\n✗ Usage: set_mode <classic/speedrun/hardcore>")
+                elif cmd.startswith("easter_egg"):
+                    parts = cmd.split(maxsplit=1)
+                    if len(parts) > 1:
+                        code = parts[1]
+                        result = self.find_easter_egg(code)
+                        output.insert(tk.END, f"\n{result if result else '✗ Invalid code'}")
+                    else:
+                        output.insert(tk.END, "\n✗ Usage: easter_egg <code>")
+                elif cmd == "facebook":
+                    self.facebook_test_mode = True
+                    output.insert(tk.END, "\n✓ Facebook test mode enabled")
+                elif cmd == "version":
+                    output.insert(tk.END, "\nv1.67 April Fools + Restoration")
+                elif cmd == "help":
+                    output.insert(tk.END, help_text)
+                else:
+                    output.insert(tk.END, "\n✗ Unknown command")
+            except Exception as e:
+                output.insert(tk.END, f"\n✗ Error: {e}")
+            
+            output.see(tk.END)
+            output.config(state=tk.DISABLED)
+            cmd_entry.delete(0, tk.END)
+        
+        tk.Button(cmd_frame, text="Execute", command=execute_command, bg="#00aa00",
+                 fg="#000", font=("Courier", 9)).pack(side=tk.LEFT, padx=5)
+        
+        cmd_entry.bind("<Return>", lambda e: execute_command())
+        cmd_entry.focus()
     
     def calculate_xp(self, sp_gained):
         """Calculate XP earned based on SP gained"""
