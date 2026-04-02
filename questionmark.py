@@ -96,82 +96,6 @@ class AccountManager:
         return f"user_{username}_equipment.json"
 
 class RollingGame:
-    def __init__(self, username=None):
-        # Account system
-        self.account_manager = AccountManager()
-        self.current_username = username
-        
-        self.roll_count = 0
-        self.rolls_history = []
-        self.target_properties = set()
-        self.game_won = False
-        self.auto_rolling = False
-        self.wins_count = 0
-        self.player_level = 1
-        self.player_xp = 0
-        self.xp_to_level_up = 100
-        
-        # RNG CONTROL SYSTEM
-        self.luck_percentage = 0
-        self.pity_loss_counter = 0
-        self.reroll_tokens = 0
-        self.reroll_uses = 0
-        
-        # PROGRESSIVE MECHANICS
-        self.progressive_mechanics = {
-            "difficulty_scaling": {"unlocked": False, "level": 5},
-            "time_pressure": {"unlocked": False, "level": 8},
-            "modifiers": {"unlocked": False, "level": 10},
-            "combos": {"unlocked": False, "level": 12},
-            "cascading_effects": {"unlocked": False, "level": 15},
-            "property_rarity": {"unlocked": False, "level": 18},
-            "dynamic_difficulty": {"unlocked": False, "level": 25},
-        }
-        self.current_modifiers = []
-        self.cascade_chain = 0
-        
-        # SYSTEMS INTERACTION
-        self.system_synergies = {
-            "equipment_power": 0,
-            "combat_efficiency": 0,
-            "economy_multiplier": 1.0,
-            "total_synergy": 1.0
-        }
-        self.current_theme = "dark"
-        self.sound_enabled = True
-        self.animations_enabled = True
-        self.achievements = self._load_achievements()
-        self.stats = self._load_stats()
-        self.tutorial_mode = False
-        self.tutorial_step = 0
-        
-        # Daily Challenge System
-        self.daily_challenges = self._init_daily_challenges()
-        self.challenge_progress = self._load_challenge_progress()
-        
-        # SP and Equipment System
-        self.sp = 0  # Regular SP (5 characters)
-        self.sp_plus = 0  # SP+ (10 characters)
-        self.sp_x = 0  # SPx (20 characters)
-        self.sp_caret = 0  # SP^ (40+ characters)
-        self.equipped_gauntlet = None  # Left hand
-        self.equipped_device = None  # Right hand
-        self.equipment_inventory = self._load_equipment()
-        self._init_equipment_recipes()
-        
-        # Difficulty setting
-        self.difficulty = "normal"
-        
-        # Initialize game
-        self._generate_target()
-        self.possible_properties = [
-            "has_numbers", "has_symbols", "has_uppercase", "has_lowercase", "is_long",
-            "has_spaces", "has_operators", "has_multiple_words", "has_repeats",
-            "starts_with_letter", "ends_with_symbol", "has_punctuation", "has_vowels",
-            "is_very_long", "has_consecutive_letters"
-        ]
-        self._setup_gui()
-        self._play_startup_sound()
     
     def _init_equipment_recipes(self):
         """Initialize equipment crafting recipes"""
@@ -353,53 +277,6 @@ class RollingGame:
         status_label = tk.Label(login_root, text="", bg="#2b2b2b", fg="#ffff00", font=("Arial", 9))
         status_label.pack(pady=5)
         
-        def login():
-            username = username_entry.get().strip()
-            password = password_entry.get()
-            if not username or not password:
-                status_label.config(text="Please enter username and password", fg="#ff6b6b")
-                return
-            success, msg = self.account_manager.login(username, password)
-            if success:
-                self.current_username = username
-                login_root.destroy()
-                self.root = None
-                self._setup_gui()
-                self.root.mainloop()
-            else:
-                status_label.config(text=msg, fg="#ff6b6b")
-        
-        def register():
-            username = username_entry.get().strip()
-            password = password_entry.get()
-            if not username or not password:
-                status_label.config(text="Please enter username and password", fg="#ff6b6b")
-                return
-            success, msg = self.account_manager.register(username, password)
-            if success:
-                status_label.config(text="Account created! Now login", fg="#00ff00")
-                username_entry.delete(0, tk.END)
-                password_entry.delete(0, tk.END)
-            else:
-                status_label.config(text=msg, fg="#ff6b6b")
-        
-        # Button frame
-        btn_frame = tk.Frame(login_root, bg="#2b2b2b")
-        btn_frame.pack(pady=20)
-        
-        login_btn = tk.Button(btn_frame, text="Login", command=login, bg="#00cc00", fg="#000000",
-                             font=("Arial", 11, "bold"), padx=15, pady=8)
-        login_btn.pack(side=tk.LEFT, padx=10)
-        
-        register_btn = tk.Button(btn_frame, text="Register", command=register, bg="#0099ff", fg="#000000",
-                                font=("Arial", 11, "bold"), padx=15, pady=8)
-        register_btn.pack(side=tk.LEFT, padx=10)
-        
-        guest_btn = tk.Button(btn_frame, text="Guest", command=lambda: login_root.destroy(),
-                             bg="#666666", fg="#ffffff", font=("Arial", 11, "bold"), padx=15, pady=8)
-        guest_btn.pack(side=tk.LEFT, padx=10)
-        
-        login_root.mainloop()
     
     def _setup_gui(self):
         """Setup the GUI"""
@@ -1055,59 +932,6 @@ Total Synergy:        {self.system_synergies['total_synergy']:.2f}x
         with open("rng_data.json", 'w', encoding='utf-8') as f:
             json.dump(rng_data, f)
 
-    def _calculate_player_luck(self):
-        """Calculate player luck percentage - affects win chance"""
-        base_luck = 10  # Base 10% win chance
-        
-        # Equipment bonus (5% per equipped item, max 25%)
-        equipped_count = sum(1 for inv in self.inventory.values() if inv and inv.get("equipped"))
-        equipment_bonus = min(equipped_count * 5, 25)
-        
-        # Ability bonuses
-        ability_bonus = 0
-        if self.abilities.get("luck_boost", {}).get("learned"):
-            ability_bonus += 10
-        if self.abilities.get("fortune_favors", {}).get("learned"):
-            ability_bonus += 5
-        
-        # Level scaling (1% per 5 levels)
-        level_bonus = (self.player_level // 5)
-        
-        # Lucky streak bonus (2% per 3 consecutive wins)
-        streak_bonus = (self.winning_streak // 3) * 2
-        
-        total_luck = min(base_luck + equipment_bonus + ability_bonus + level_bonus + streak_bonus, 50)
-        self.luck_percentage = total_luck
-        return total_luck
-
-    def _apply_luck_to_roll(self):
-        """Apply luck to determine if this roll is lucky"""
-        luck = self._calculate_player_luck()
-        return random.randint(1, 100) <= luck
-
-    def _handle_pity_system(self):
-        """Handle pity system - guaranteed win after 50 losses"""
-        if self.pity_loss_counter >= 50:
-            self.pity_loss_counter = 0
-            return True
-        return False
-
-    def use_reroll_token(self):
-        """Use a reroll token to re-roll the result"""
-        cost = 1  # One token per use
-        if self.reroll_tokens >= cost:
-            self.reroll_tokens -= cost
-            self.reroll_uses += 1
-            return True
-        elif self.sp >= 10:
-            self.sp -= 10
-            self.reroll_uses += 1
-            return True
-        return False
-
-    def gain_reroll_tokens(self, amount):
-        """Gain reroll tokens from achievements or shops"""
-        self.reroll_tokens += amount
 
     def _apply_rng_to_result(self, matches, total_targets):
         """Apply combined RNG effects to roll result"""
@@ -1177,38 +1001,6 @@ Reroll Tokens:
                              justify=tk.LEFT)
         info_label.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-    def _init_progressive_mechanics(self):
-        """Initialize progressive mechanics system"""
-        for mechanic, data in self.progressive_mechanics.items():
-            if self.player_level >= data["level"]:
-                data["unlocked"] = True
-
-    def _update_progressive_mechanics(self):
-        """Update mechanics when leveling up"""
-        for mechanic, data in self.progressive_mechanics.items():
-            if data["unlocked"] and not data.get("announced", False):
-                data["announced"] = True
-
-    def get_target_property_count(self):
-        """Get number of target properties based on difficulty progression"""
-        base = 3
-        if not self.progressive_mechanics["difficulty_scaling"]["unlocked"]:
-            return base
-        # Increase by 1 every 5 levels (max +3 extra)
-        extra = min((self.player_level // 5), 3)
-        return base + extra
-
-    def get_active_game_modifiers(self):
-        """Get current active game modifiers"""
-        modifiers = []
-        if not self.progressive_mechanics["modifiers"]["unlocked"]:
-            return modifiers
-        
-        # 15% chance to activate random modifier each roll
-        if random.random() < 0.15:
-            modifier_pool = ["double_reveal", "hidden_property", "time_rush", "property_switch"]
-            modifiers.append(random.choice(modifier_pool))
-        return modifiers
 
     def apply_random_modifier(self):
         """Apply a random modifier to current roll"""
@@ -1218,103 +1010,11 @@ Reroll Tokens:
             return modifiers[0]
         return None
 
-    def trigger_cascading_effect(self):
-        """Trigger cascading win effect for consecutive wins"""
-        if not self.progressive_mechanics["cascading_effects"]["unlocked"]:
-            return 0
-        
-        self.cascade_chain += 1
-        bonus = self.cascade_chain * 5
-        
-        # Every 5 cascades, double the bonus
-        if self.cascade_chain % 5 == 0:
-            bonus *= 2
-        
-        return bonus
-
-    def get_dynamic_difficulty_multiplier(self):
-        """Get difficulty multiplier based on performance"""
-        if not self.progressive_mechanics["dynamic_difficulty"]["unlocked"]:
-            return 1.0
-        
-        # Streak multiplier (every 5 wins = 1.25x)
-        streak_mult = 1.0 + (min(self.winning_streak // 5, 8) * 0.25)
-        
-        # Level multiplier (every 10 levels = 1.1x)
-        level_mult = 1.0 + (self.player_level // 10) * 0.1
-        
-        return min(streak_mult * level_mult, 3.0)
-
-    def _init_systems_interaction(self):
-        """Initialize systems interaction framework"""
-        self._calculate_system_synergies()
-
-    def _calculate_system_synergies(self):
-        """Recalculate all cross-system synergies"""
-        # Equipment→Combat: Each equipped item boosts combat by 5%
-        equipped = sum(1 for inv in self.inventory.values() if inv and inv.get("equipped"))
-        equipment_power = equipped * 5
-        
-        # Abilities→Combat: Each learned ability +3%
-        learned_abilities = sum(1 for ab in self.abilities.values() if ab and ab.get("learned"))
-        combat_efficiency = learned_abilities * 3
-        
-        # Combos→Economy: Win streaks boost SP rewards
-        combo_bonus = min(self.winning_streak // 3, 5)
-        economy_multiplier = 1.0 + (combo_bonus * 0.15)
-        
-        # Total synergy (combined effect)
-        total = 1.0 + (equipment_power / 100) + (combat_efficiency / 100) + (economy_multiplier - 1.0)
-        total_synergy = min(max(total, 1.0), 3.0)
-        
-        self.system_synergies = {
-            "equipment_power": equipment_power,
-            "combat_efficiency": combat_efficiency,
-            "economy_multiplier": economy_multiplier,
-            "total_synergy": total_synergy
-        }
-
-    def apply_systems_interaction_on_win(self, sp_gained):
-        """Apply systems synergy to SP rewards"""
-        self._calculate_system_synergies()
-        multiplier = self.system_synergies["total_synergy"]
-        modified_sp = int(sp_gained * multiplier)
-        return modified_sp, self.system_synergies["equipment_power"]
 
     def apply_systems_interaction_on_loss(self):
         """Apply systems when losing (reduce pity counter)"""
         self.pity_loss_counter += 1
 
-    def get_synergy_multiplier(self):
-        """Get current total synergy multiplier (1.0x - 3.0x)"""
-        return self.system_synergies.get("total_synergy", 1.0)
-
-    def report_system_interactions(self):
-        """Generate full systems interaction report"""
-        self._calculate_system_synergies()
-        report = f"""
-╔══════════════════════════════════════════════╗
-║      SYSTEMS SYNERGY INTERACTION REPORT      ║
-╚══════════════════════════════════════════════╝
-
-EQUIPMENT → COMBAT:
-  Equipment Items Equipped: {sum(1 for inv in self.inventory.values() if inv and inv.get("equipped"))}
-  Combat Bonus: +{self.system_synergies["equipment_power"]}%
-
-COMBAT → ECONOMY:
-  Learned Abilities: {sum(1 for ab in self.abilities.values() if ab and ab.get("learned"))}
-  Combat Efficiency: +{self.system_synergies["combat_efficiency"]}%
-
-ECONOMY → UPGRADES:
-  Winning Streak: {self.winning_streak}
-  Economy Multiplier: {self.system_synergies["economy_multiplier"]:.2f}x
-
-TOTAL SYNERGY MULTIPLIER: {self.system_synergies["total_synergy"]:.2f}x
-(Range: 1.0x - 3.0x)
-
-Effect: All rewards multiplied by {self.system_synergies["total_synergy"]:.2f}x
-"""
-        return report
 
     def show_systems_synergy_window(self):
         """Display systems synergy information window"""
@@ -2318,69 +2018,3 @@ def main():
 
 
 
-    def show_rng_control_window(self):
-        """Show RNG Control interface"""
-        rng_win = tk.Toplevel(self.root)
-        rng_win.title("🍀 RNG Control Panel")
-        rng_win.geometry("500x400")
-        rng_win.configure(bg="#2b2b2b")
-        
-        title = tk.Label(rng_win, text="RNG CONTROL", font=("Segoe UI", 14, "bold"), 
-                        bg="#2b2b2b", fg="#00ff00")
-        title.pack(pady=10)
-        
-        luck = self._calculate_player_luck()
-        info_text = f"""
-Luck: {luck}%
-Pity Counter: {self.pity_loss_counter}/50
-Reroll Tokens: {self.reroll_tokens}
-
-Luck is affected by:
-  • Equipment (+5% per item)
-  • Abilities (+15% if unlocked)
-  • Level (+1% per 5 levels)
-  • Maximum: 50%
-"""
-        info_label = tk.Label(rng_win, text=info_text, font=("Courier", 10),
-                             bg="#1e1e1e", fg="#ffffff", justify=tk.LEFT)
-        info_label.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-    
-    def show_progressive_mechanics_window(self):
-        """Show Progressive Mechanics status"""
-        prog_win = tk.Toplevel(self.root)
-        prog_win.title("📈 Progressive Mechanics")
-        prog_win.geometry("500x450")
-        prog_win.configure(bg="#2b2b2b")
-        
-        title = tk.Label(prog_win, text="PROGRESSIVE MECHANICS", font=("Segoe UI", 14, "bold"),
-                        bg="#2b2b2b", fg="#00ff00")
-        title.pack(pady=10)
-        
-        mechanics_text = "UNLOCKED MECHANICS:\n"
-        for mechanic, data in self.progressive_mechanics.items():
-            status = "✓ UNLOCKED" if data["unlocked"] else f"🔒 Level {data['level']}"
-            mechanics_text += f"{mechanic.replace('_', ' ').title()}: {status}\n"
-        
-        info_label = tk.Label(prog_win, text=mechanics_text, font=("Courier", 10),
-                             bg="#1e1e1e", fg="#ffffff", justify=tk.LEFT)
-        info_label.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-    
-    def show_systems_synergy_window(self):
-        """Show Systems Synergy interface"""
-        synergy_win = tk.Toplevel(self.root)
-        synergy_win.title("🔗 Systems Synergy")
-        synergy_win.geometry("550x500")
-        synergy_win.configure(bg="#2b2b2b")
-        
-        title = tk.Label(synergy_win, text="SYSTEMS SYNERGY REPORT", font=("Segoe UI", 14, "bold"),
-                        bg="#2b2b2b", fg="#00ff00")
-        title.pack(pady=10)
-        
-        report = self.report_system_interactions()
-        info_label = tk.Label(synergy_win, text=report, font=("Courier", 10),
-                             bg="#1e1e1e", fg="#00ff00", justify=tk.LEFT)
-        info_label.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-
-
-if __name__ == "__main__":
-    main()
