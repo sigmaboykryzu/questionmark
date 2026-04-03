@@ -2,7 +2,7 @@
 
 A strategic puzzle game where you deduce hidden properties of strings through intelligent guessing. Build your character, unlock equipment, compete in PvP and tournaments, and climb the leaderboards.
 
-**NEW in v2.0**: Massive overhaul — Progression Hub, Tournament System, PvP Arena, Dev Console, and full UI revamp!
+**NEW in v2.0**: Massive overhaul — Progression Hub, Tournament System, PvP Arena, and full UI revamp!
 
 ## Quick Start
 
@@ -52,12 +52,6 @@ python questionmark.py
 - **37 Achievements** — 8 categories with rarity tiers and SP rewards
 - **6-Tab Leaderboard** — Wins, Rolls, Level, Win Rate, Streak, ELO
 - **Next Achievement Tracker** — Widget on main screen
-
-### 🔧 Dev Console (DeMarcusThe2nd only)
-- **40+ Commands** — Full developer toolkit
-- **Data Inspection** — `whoami`, `exportstats`, `meminfo`, `filecheck`
-- **State Manipulation** — Set any stat, ELO, streak, SP, XP, level
-- **Diagnostics** — `listprops`, `listach`, `listtournaments`, `eventlog`, `reload`
 
 ### UI & Quality of Life
 - **Modern Dark Theme** — Full styled UI with accent colors
