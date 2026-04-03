@@ -7172,6 +7172,9 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
 
     def _get_player_title_for_wins(self, wins):
         """Get title based on wins count"""
+        # Special unique title for DeMarcusThe2nd
+        if getattr(self, "current_username", None) == "DeMarcusThe2nd":
+            return "👑 The One And Only"
         if wins >= 500:
             return "⚜️ Mythic"
         elif wins >= 250:
