@@ -11293,6 +11293,26 @@ DISCOVERY STATS:
             ("saveforce", "Force save all game data immediately"),
             ("time <hh:mm>", "Simulate time (for testing midnight mode)"),
             ("cheatmode", "Toggle cheat mode - grants 10000 of all currencies"),
+            ("reveal", "Reveal the current target properties (spoiler!)"),
+            ("autowin", "Instantly win the current round"),
+            ("addxp <n>", "Add N amount of XP to current total"),
+            ("addwins <n>", "Add N wins without rolling"),
+            ("addrolls <n>", "Add N to total roll count"),
+            ("setelo <n>", "Set PvP ELO rating to N"),
+            ("setstreak <n>", "Set current winning streak to N"),
+            ("setpvpwins <n>", "Set PvP wins count to N"),
+            ("setpvplosses <n>", "Set PvP losses count to N"),
+            ("resetpvp", "Reset all PvP stats to defaults"),
+            ("maxstats", "Max out level, wins, streak, and all currencies"),
+            ("unlockachall", "Unlock ALL achievements at once"),
+            ("listach", "List all achievements and their unlock status"),
+            ("prestige", "Force prestige (bypass requirements)"),
+            ("setkarma <n>", "Set karma level to N"),
+            ("addluck <n>", "Add N luck tokens"),
+            ("whoami", "Show full player profile dump"),
+            ("nuke", "Factory reset ALL player data (dangerous!)"),
+            ("cls", "Clear the console output"),
+            ("echo <text>", "Print text to the console"),
         ]
         
         for cmd, desc in commands_list:
@@ -11377,6 +11397,26 @@ DISCOVERY STATS:
   saveforce     : Force save all game data
   time <hh:mm>  : Simulate time - usage: time 23:59
   cheatmode     : Grant 10000 of all currencies
+  reveal        : Reveal current target properties
+  autowin       : Instantly win the current round
+  addxp <n>     : Add XP - usage: addxp 1000
+  addwins <n>   : Add wins - usage: addwins 50
+  addrolls <n>  : Add rolls - usage: addrolls 100
+  setelo <n>    : Set PvP ELO - usage: setelo 1500
+  setstreak <n> : Set win streak - usage: setstreak 20
+  setpvpwins <n>: Set PvP wins - usage: setpvpwins 50
+  setpvplosses <n>: Set PvP losses - usage: setpvplosses 10
+  resetpvp      : Reset all PvP stats to defaults
+  maxstats      : Max out everything
+  unlockachall  : Unlock ALL achievements
+  listach       : List achievements & status
+  prestige      : Force prestige (skip requirements)
+  setkarma <n>  : Set karma level - usage: setkarma 100
+  addluck <n>   : Add luck tokens - usage: addluck 5
+  whoami        : Full player profile dump
+  nuke          : Factory reset ALL data (dangerous!)
+  cls / clear   : Clear console output
+  echo <text>   : Print text to console
 
 Type 'help' to see this again.
 """
@@ -11508,6 +11548,192 @@ Type 'help' to see this again.
                     self.sp_x += 10000
                     self.sp_caret += 10000
                     self._update_sp_label()
+                elif cmd == "reveal":
+                    if self.target_properties:
+                        props = ", ".join(sorted(self.target_properties))
+                        console_text.insert(tk.END, f"\n[REVEAL] Target properties ({len(self.target_properties)}): {props}")
+                    else:
+                        console_text.insert(tk.END, "\n[WARN] No active round — target properties not set")
+                elif cmd == "autowin":
+                    if self.target_properties:
+                        self.wins_count += 1
+                        self.winning_streak += 1
+                        if self.winning_streak > self.max_winning_streak:
+                            self.max_winning_streak = self.winning_streak
+                        self.stats["total_wins"] = self.wins_count
+                        self.wins_label.config(text=str(self.wins_count))
+                        console_text.insert(tk.END, f"\n[OK] Auto-win! Wins: {self.wins_count}, Streak: {self.winning_streak}")
+                    else:
+                        console_text.insert(tk.END, "\n[WARN] No active round to win")
+                elif cmd.startswith("addxp "):
+                    try:
+                        amount = int(cmd.split()[1])
+                        self.player_xp += amount
+                        console_text.insert(tk.END, f"\n[OK] Added {amount} XP. Total: {self.player_xp}/{self.xp_to_level_up}")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: addxp <number>")
+                elif cmd.startswith("addwins "):
+                    try:
+                        amount = int(cmd.split()[1])
+                        self.wins_count += amount
+                        self.stats["total_wins"] = self.wins_count
+                        self.wins_label.config(text=str(self.wins_count))
+                        console_text.insert(tk.END, f"\n[OK] Added {amount} wins. Total: {self.wins_count}")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: addwins <number>")
+                elif cmd.startswith("addrolls "):
+                    try:
+                        amount = int(cmd.split()[1])
+                        self.roll_count += amount
+                        self.stats["total_rolls"] = self.roll_count
+                        self.roll_label.config(text=str(self.roll_count))
+                        console_text.insert(tk.END, f"\n[OK] Added {amount} rolls. Total: {self.roll_count}")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: addrolls <number>")
+                elif cmd.startswith("setelo "):
+                    try:
+                        elo = int(cmd.split()[1])
+                        self.pvp_elo = elo
+                        rn, rc = self._pvp_rank_for_elo(elo)
+                        console_text.insert(tk.END, f"\n[OK] ELO set to {elo} ({rn})")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: setelo <number>")
+                elif cmd.startswith("setstreak "):
+                    try:
+                        s = int(cmd.split()[1])
+                        self.winning_streak = s
+                        if s > self.max_winning_streak:
+                            self.max_winning_streak = s
+                        console_text.insert(tk.END, f"\n[OK] Streak set to {s} (best: {self.max_winning_streak})")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: setstreak <number>")
+                elif cmd.startswith("setpvpwins "):
+                    try:
+                        n = int(cmd.split()[1])
+                        self.pvp_wins = n
+                        console_text.insert(tk.END, f"\n[OK] PvP wins set to {n}")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: setpvpwins <number>")
+                elif cmd.startswith("setpvplosses "):
+                    try:
+                        n = int(cmd.split()[1])
+                        self.pvp_losses = n
+                        console_text.insert(tk.END, f"\n[OK] PvP losses set to {n}")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: setpvplosses <number>")
+                elif cmd == "resetpvp":
+                    self.pvp_elo = 1000
+                    self.pvp_wins = 0
+                    self.pvp_losses = 0
+                    self.pvp_draws = 0
+                    self.pvp_streak = 0
+                    self.pvp_best_streak = 0
+                    console_text.insert(tk.END, "\n[OK] All PvP stats reset to defaults (ELO 1000)")
+                elif cmd == "maxstats":
+                    self.player_level = 100
+                    self.player_xp = 0
+                    self.wins_count = 9999
+                    self.roll_count = 99999
+                    self.winning_streak = 999
+                    self.max_winning_streak = 999
+                    self.sp += 99999
+                    self.sp_plus += 9999
+                    self.sp_x += 9999
+                    self.sp_caret += 9999
+                    self.pvp_elo = 2500
+                    self.stats["total_wins"] = self.wins_count
+                    self.stats["total_rolls"] = self.roll_count
+                    self.wins_label.config(text=str(self.wins_count))
+                    self.roll_label.config(text=str(self.roll_count))
+                    self._update_sp_label()
+                    console_text.insert(tk.END, "\n[OK] All stats maxed out! You are a god now.")
+                elif cmd == "unlockachall":
+                    count = 0
+                    for k in self.achievements:
+                        if not self.achievements[k].get("completed") and not self.achievements[k].get("unlocked"):
+                            count += 1
+                        self.achievements[k]["completed"] = True
+                        self.achievements[k]["unlocked"] = True
+                    console_text.insert(tk.END, f"\n[OK] All {len(self.achievements)} achievements unlocked ({count} newly unlocked)")
+                elif cmd == "listach":
+                    console_text.insert(tk.END, "\n[ACHIEVEMENTS]")
+                    for aid, ach in self.achievements.items():
+                        done = ach.get("completed") or ach.get("unlocked")
+                        icon = "✅" if done else "❌"
+                        name = ach.get("name", aid)
+                        console_text.insert(tk.END, f"\n  {icon} {aid}: {name}")
+                elif cmd == "prestige":
+                    self.prestige_system["current_level"] = self.prestige_system.get("current_level", 0) + 1
+                    self.prestige_system["total_prestiges"] = self.prestige_system.get("total_prestiges", 0) + 1
+                    self.prestige_system["prestige_points"] = self.prestige_system.get("prestige_points", 0) + 10
+                    lvl = self.prestige_system["current_level"]
+                    console_text.insert(tk.END, f"\n[OK] Force-prestiged! Now Prestige Level {lvl} (+10 PP awarded)")
+                elif cmd.startswith("setkarma "):
+                    try:
+                        k = int(cmd.split()[1])
+                        self.rng_influence["karma_system"]["karma_level"] = k
+                        console_text.insert(tk.END, f"\n[OK] Karma level set to {k}")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: setkarma <number>")
+                elif cmd.startswith("addluck "):
+                    try:
+                        n = int(cmd.split()[1])
+                        lt = self.rng_influence.get("luck_tokens", {})
+                        lt["current"] = lt.get("current", 0) + n
+                        console_text.insert(tk.END, f"\n[OK] Added {n} luck tokens. Total: {lt['current']}/{lt.get('max', '?')}")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: addluck <number>")
+                elif cmd == "whoami":
+                    title = self._get_player_title_for_wins(self.wins_count)
+                    rn, _ = self._pvp_rank_for_elo(getattr(self, 'pvp_elo', 1000))
+                    ach_done = sum(1 for a in self.achievements.values() if a.get("completed") or a.get("unlocked"))
+                    spec = self.current_specialization or "None"
+                    prest = self.prestige_system.get("current_level", 0)
+                    info = (f"\n[PROFILE] {self.current_username}"
+                            f"\n  Title:    {title}"
+                            f"\n  Level:    {self.player_level}  (XP: {self.player_xp}/{self.xp_to_level_up})"
+                            f"\n  Wins:     {self.wins_count}  |  Rolls: {self.roll_count}"
+                            f"\n  Streak:   {self.winning_streak} (best: {self.max_winning_streak})"
+                            f"\n  SP:       {self.sp} | SP+: {self.sp_plus} | SPx: {self.sp_x} | SP^: {self.sp_caret}"
+                            f"\n  PvP ELO:  {getattr(self, 'pvp_elo', 1000)} ({rn})  W:{getattr(self, 'pvp_wins', 0)} L:{getattr(self, 'pvp_losses', 0)}"
+                            f"\n  Achieve:  {ach_done}/{len(self.achievements)}"
+                            f"\n  Spec:     {spec}"
+                            f"\n  Prestige: Lv{prest}")
+                    console_text.insert(tk.END, info)
+                elif cmd == "nuke":
+                    self.wins_count = 0
+                    self.roll_count = 0
+                    self.player_level = 1
+                    self.player_xp = 0
+                    self.winning_streak = 0
+                    self.max_winning_streak = 0
+                    self.sp = 0
+                    self.sp_plus = 0
+                    self.sp_x = 0
+                    self.sp_caret = 0
+                    self.pvp_elo = 1000
+                    self.pvp_wins = 0
+                    self.pvp_losses = 0
+                    self.pvp_draws = 0
+                    self.pvp_streak = 0
+                    self.pvp_best_streak = 0
+                    self.prestige_system["current_level"] = 0
+                    self.prestige_system["prestige_points"] = 0
+                    self.prestige_system["total_prestiges"] = 0
+                    self.achievements = {k: {**v, "completed": False, "unlocked": False} for k, v in self.achievements.items()}
+                    self.stats["total_wins"] = 0
+                    self.stats["total_rolls"] = 0
+                    self.stats["best_streak"] = 0
+                    self.wins_label.config(text="0")
+                    self.roll_label.config(text="0")
+                    self._update_sp_label()
+                    console_text.insert(tk.END, "\n[☢️ NUKE] ALL player data has been factory reset.")
+                elif cmd in ("cls", "clear"):
+                    console_text.delete("1.0", tk.END)
+                    console_text.insert(tk.END, ">>> Console cleared.\n>>> Ready for input")
+                elif cmd.startswith("echo "):
+                    text = cmd[5:]
+                    console_text.insert(tk.END, f"\n{text}")
                 else:
                     console_text.insert(tk.END, f"\n[ERROR] Unknown command: '{cmd}'. Type 'help' for available commands")
                 
