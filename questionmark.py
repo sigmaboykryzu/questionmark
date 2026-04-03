@@ -7056,7 +7056,8 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             profile = tk.Frame(lb_win, bg=ui["bg_card"], highlightbackground=ui["gold"], highlightthickness=2)
             profile.pack(fill=tk.X, padx=15, pady=(10, 4))
 
-            tk.Label(profile, text=f"👤  {me['name']}  —  {me['title']}", font=ui["font_subhead"],
+            profile_font = ("Segoe UI", 16, "bold") if me["name"] == "DeMarcusThe2nd" else ui["font_subhead"]
+            tk.Label(profile, text=f"👤  {me['name']}  —  {me['title']}", font=profile_font,
                      bg=ui["bg_card"], fg=ui["gold"]).pack(anchor="w", padx=12, pady=(8, 2))
 
             info_row = tk.Frame(profile, bg=ui["bg_card"])
@@ -7148,8 +7149,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                 tk.Label(row, text="  ".join(extras[:3]), font=ui["font_small"],
                          bg=row_bg, fg=ui["text_secondary"], anchor="w").pack(side=tk.LEFT, padx=(12, 0))
 
-                tk.Label(row, text=p["title"], font=ui["font_small"],
-                         bg=row_bg, fg=ui["text_muted"]).pack(side=tk.RIGHT, padx=(0, 8))
+                title_font = ("Segoe UI", 13, "bold") if p["name"] == "DeMarcusThe2nd" else ui["font_small"]
+                title_fg = ui["gold"] if p["name"] == "DeMarcusThe2nd" else ui["text_muted"]
+                tk.Label(row, text=p["title"], font=title_font,
+                         bg=row_bg, fg=title_fg).pack(side=tk.RIGHT, padx=(0, 8))
 
         for label, key, desc in tab_defs:
             tab = tk.Frame(nb, bg=ui["bg_secondary"])
@@ -8996,7 +8999,8 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                 row.pack(fill=tk.X, padx=4, pady=1)
                 tk.Label(row, text=f" {medal}", font=ui["font_body_bold"], bg=row_bg, fg=fg,
                          width=4, anchor="w").pack(side=tk.LEFT, padx=(4, 0))
-                tk.Label(row, text=pl["name"], font=ui["font_body_bold"], bg=row_bg, fg=fg,
+                name_font = ("Segoe UI", 13, "bold") if pl["name"] == "DeMarcusThe2nd" else ui["font_body_bold"]
+                tk.Label(row, text=pl["name"], font=name_font, bg=row_bg, fg=fg,
                          width=16, anchor="w").pack(side=tk.LEFT, padx=(4, 0))
                 tk.Label(row, text=f'ELO {pl["elo"]}', font=ui["font_mono_sm"], bg=row_bg,
                          fg=r_color, width=9, anchor="e").pack(side=tk.LEFT, padx=(6, 0))
@@ -10340,7 +10344,8 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                     row.pack(fill=tk.X, padx=4, pady=1)
                     tk.Label(row, text=f" {med}", font=ui["font_body_bold"], bg=rbg,
                              fg=fc, width=4, anchor="w").pack(side=tk.LEFT, padx=(4, 0))
-                    tk.Label(row, text=e["name"], font=ui["font_body_bold"], bg=rbg,
+                    t_name_font = ("Segoe UI", 13, "bold") if e["name"] == "DeMarcusThe2nd" else ui["font_body_bold"]
+                    tk.Label(row, text=e["name"], font=t_name_font, bg=rbg,
                              fg=fc, width=16, anchor="w").pack(side=tk.LEFT, padx=(4, 0))
                     tk.Label(row, text=f'{e["score"]} {unit}', font=ui["font_mono_sm"], bg=rbg,
                              fg=ui["accent_light"]).pack(side=tk.RIGHT, padx=(0, 10))
