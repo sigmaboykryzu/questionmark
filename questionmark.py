@@ -11313,6 +11313,16 @@ DISCOVERY STATS:
             ("nuke", "Factory reset ALL player data (dangerous!)"),
             ("cls", "Clear the console output"),
             ("echo <text>", "Print text to the console"),
+            ("tp <n>", "Set target property count for next round to N"),
+            ("godroll", "Force next roll to be an instant win"),
+            ("bankrupt", "Set all currencies to 0"),
+            ("rename <name>", "Change your display username"),
+            ("speed <n>", "Set game animation speed multiplier (1-10)"),
+            ("listtournaments", "Show all tournament personal bests"),
+            ("setplaytime <h>", "Set total play time in hours"),
+            ("exportstats", "Dump full stats JSON to console"),
+            ("rain <n>", "SP rain - randomly distribute N SP across currencies"),
+            ("lottery", "Spin a random reward (1-1000 SP, 1-100 XP, or a streak bonus)"),
         ]
         
         for cmd, desc in commands_list:
@@ -11417,6 +11427,16 @@ DISCOVERY STATS:
   nuke          : Factory reset ALL data (dangerous!)
   cls / clear   : Clear console output
   echo <text>   : Print text to console
+  tp <n>        : Set target property count (1-15)
+  godroll       : Force next roll to be an instant win
+  bankrupt      : Set all currencies to 0
+  rename <name> : Change display username
+  speed <n>     : Set animation speed multiplier (1-10)
+  listtournaments: Show tournament personal bests
+  setplaytime <h>: Set play time in hours
+  exportstats   : Dump full stats JSON to console
+  rain <n>      : SP rain - scatter N SP across currencies
+  lottery       : Spin a random reward
 
 Type 'help' to see this again.
 """
@@ -11734,6 +11754,118 @@ Type 'help' to see this again.
                 elif cmd.startswith("echo "):
                     text = cmd[5:]
                     console_text.insert(tk.END, f"\n{text}")
+                elif cmd.startswith("tp "):
+                    try:
+                        n = int(cmd.split()[1])
+                        if 1 <= n <= 15:
+                            self._dev_target_prop_count = n
+                            console_text.insert(tk.END, f"\n[OK] Next round will have {n} target properties")
+                        else:
+                            console_text.insert(tk.END, "\n[ERROR] Must be 1-15")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Usage: tp <number 1-15>")
+                elif cmd == "godroll":
+                    self._dev_godroll = True
+                    console_text.insert(tk.END, "\n[OK] God roll armed! Your next roll will be an instant win. \u2728")
+                elif cmd == "bankrupt":
+                    self.sp = 0
+                    self.sp_plus = 0
+                    self.sp_x = 0
+                    self.sp_caret = 0
+                    self._update_sp_label()
+                    console_text.insert(tk.END, "\n[OK] All currencies set to 0. You are broke. \U0001f4b8")
+                elif cmd.startswith("rename "):
+                    new_name = cmd[7:].strip()
+                    if new_name:
+                        old = self.current_username
+                        self.current_username = new_name
+                        console_text.insert(tk.END, f"\n[OK] Display name changed: {old} \u2192 {new_name}")
+                    else:
+                        console_text.insert(tk.END, "\n[ERROR] Usage: rename <new_name>")
+                elif cmd.startswith("speed "):
+                    try:
+                        n = int(cmd.split()[1])
+                        if 1 <= n <= 10:
+                            self._dev_speed_mult = n
+                            console_text.insert(tk.END, f"\n[OK] Animation speed multiplier set to {n}x")
+                        else:
+                            console_text.insert(tk.END, "\n[ERROR] Must be 1-10")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Usage: speed <1-10>")
+                elif cmd == "listtournaments":
+                    t_scores = self.tournament_data.get("scores", {})
+                    console_text.insert(tk.END, "\n[TOURNAMENTS]")
+                    for mode, icon, unit in [("speed", "\u26a1", "rolls"), ("survival", "\U0001f6e1\ufe0f", "rounds"), ("blitz", "\U0001f525", "pts")]:
+                        ms = t_scores.get(mode, {})
+                        best = ms.get("best", "\u2014")
+                        plays = ms.get("plays", 0)
+                        console_text.insert(tk.END, f"\n  {icon} {mode.title():10s}  Best: {best} {unit}  |  Played: {plays}x")
+                elif cmd.startswith("setplaytime "):
+                    try:
+                        hours = float(cmd.split()[1])
+                        self.stats["play_time"] = hours * 3600
+                        console_text.insert(tk.END, f"\n[OK] Play time set to {hours:.1f} hours")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Usage: setplaytime <hours>")
+                elif cmd == "exportstats":
+                    import pprint
+                    dump = {"wins": self.wins_count, "rolls": self.roll_count, "level": self.player_level,
+                            "xp": self.player_xp, "sp": self.sp, "sp_plus": self.sp_plus,
+                            "sp_x": self.sp_x, "sp_caret": self.sp_caret,
+                            "streak": self.winning_streak, "best_streak": self.max_winning_streak,
+                            "pvp_elo": getattr(self, "pvp_elo", 1000),
+                            "pvp_wins": getattr(self, "pvp_wins", 0),
+                            "pvp_losses": getattr(self, "pvp_losses", 0),
+                            "prestige": self.prestige_system.get("current_level", 0),
+                            "achievements_done": sum(1 for a in self.achievements.values() if a.get("completed") or a.get("unlocked")),
+                            "play_time_hours": round(self.stats.get("play_time", 0) / 3600, 2),
+                            "stats": self.stats}
+                    console_text.insert(tk.END, f"\n[EXPORT]\n{pprint.pformat(dump, width=60)}")
+                elif cmd.startswith("rain "):
+                    try:
+                        total = int(cmd.split()[1])
+                        if total <= 0:
+                            raise ValueError
+                        import random as _rng
+                        portions = [_rng.random() for _ in range(4)]
+                        s = sum(portions)
+                        portions = [int(total * p / s) for p in portions]
+                        portions[0] += total - sum(portions)  # remainder to SP
+                        self.sp += portions[0]
+                        self.sp_plus += portions[1]
+                        self.sp_x += portions[2]
+                        self.sp_caret += portions[3]
+                        self._update_sp_label()
+                        console_text.insert(tk.END, f"\n[\U0001f327\ufe0f RAIN] {total} SP scattered! SP+{portions[0]} SP++{portions[1]} SPx+{portions[2]} SP^+{portions[3]}")
+                    except Exception:
+                        console_text.insert(tk.END, "\n[ERROR] Usage: rain <positive_number>")
+                elif cmd == "lottery":
+                    import random as _rng
+                    roll = _rng.randint(1, 100)
+                    if roll <= 50:
+                        amt = _rng.randint(1, 100)
+                        self.sp += amt
+                        self._update_sp_label()
+                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] You won {amt} SP! (common)")
+                    elif roll <= 75:
+                        amt = _rng.randint(100, 500)
+                        self.sp += amt
+                        self._update_sp_label()
+                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] \u2b50 You won {amt} SP! (uncommon)")
+                    elif roll <= 90:
+                        amt = _rng.randint(50, 200)
+                        self.player_xp += amt
+                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] \U0001f31f You won {amt} XP! (rare)")
+                    elif roll <= 97:
+                        amt = _rng.randint(500, 1000)
+                        self.sp += amt
+                        self._update_sp_label()
+                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] \U0001f48e You won {amt} SP! (epic)")
+                    else:
+                        self.winning_streak += 10
+                        if self.winning_streak > self.max_winning_streak:
+                            self.max_winning_streak = self.winning_streak
+                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] \U0001f525\U0001f525\U0001f525 JACKPOT! +10 streak! (legendary) Now: {self.winning_streak}")
                 else:
                     console_text.insert(tk.END, f"\n[ERROR] Unknown command: '{cmd}'. Type 'help' for available commands")
                 
