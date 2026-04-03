@@ -11289,12 +11289,9 @@ DISCOVERY STATS:
             ("clearinv", "Clear all equipment from inventory"),
             ("togglemode <mode>", "Switch to game mode (Classic, Speed Run, Hardcore, etc)"),
             ("listmodes", "List all available game modes"),
-            ("unlockall", "Unlock all modes and grant 500 wins"),
             ("saveforce", "Force save all game data immediately"),
             ("time <hh:mm>", "Simulate time (for testing midnight mode)"),
-            ("cheatmode", "Toggle cheat mode - grants 10000 of all currencies"),
-            ("reveal", "Reveal the current target properties (spoiler!)"),
-            ("autowin", "Instantly win the current round"),
+            ("reveal", "Reveal the current target properties"),
             ("addxp <n>", "Add N amount of XP to current total"),
             ("addwins <n>", "Add N wins without rolling"),
             ("addrolls <n>", "Add N to total roll count"),
@@ -11303,26 +11300,24 @@ DISCOVERY STATS:
             ("setpvpwins <n>", "Set PvP wins count to N"),
             ("setpvplosses <n>", "Set PvP losses count to N"),
             ("resetpvp", "Reset all PvP stats to defaults"),
-            ("maxstats", "Max out level, wins, streak, and all currencies"),
             ("unlockachall", "Unlock ALL achievements at once"),
             ("listach", "List all achievements and their unlock status"),
-            ("prestige", "Force prestige (bypass requirements)"),
             ("setkarma <n>", "Set karma level to N"),
             ("addluck <n>", "Add N luck tokens"),
             ("whoami", "Show full player profile dump"),
-            ("nuke", "Factory reset ALL player data (dangerous!)"),
             ("cls", "Clear the console output"),
             ("echo <text>", "Print text to the console"),
             ("tp <n>", "Set target property count for next round to N"),
-            ("godroll", "Force next roll to be an instant win"),
-            ("bankrupt", "Set all currencies to 0"),
             ("rename <name>", "Change your display username"),
             ("speed <n>", "Set game animation speed multiplier (1-10)"),
             ("listtournaments", "Show all tournament personal bests"),
             ("setplaytime <h>", "Set total play time in hours"),
             ("exportstats", "Dump full stats JSON to console"),
-            ("rain <n>", "SP rain - randomly distribute N SP across currencies"),
-            ("lottery", "Spin a random reward (1-1000 SP, 1-100 XP, or a streak bonus)"),
+            ("reload", "Reload all player data from disk files"),
+            ("listprops", "List all 15 possible string properties"),
+            ("filecheck", "Verify all user data files exist and are valid JSON"),
+            ("meminfo", "Show memory usage and object counts"),
+            ("eventlog", "Show last 20 game events from this session"),
         ]
         
         for cmd, desc in commands_list:
@@ -11403,12 +11398,9 @@ DISCOVERY STATS:
   clearinv      : Clear equipment inventory
   togglemode <m>: Switch game mode - usage: togglemode hardcore
   listmodes     : Show all available game modes
-  unlockall     : Unlock everything (500 wins)
   saveforce     : Force save all game data
   time <hh:mm>  : Simulate time - usage: time 23:59
-  cheatmode     : Grant 10000 of all currencies
   reveal        : Reveal current target properties
-  autowin       : Instantly win the current round
   addxp <n>     : Add XP - usage: addxp 1000
   addwins <n>   : Add wins - usage: addwins 50
   addrolls <n>  : Add rolls - usage: addrolls 100
@@ -11417,26 +11409,24 @@ DISCOVERY STATS:
   setpvpwins <n>: Set PvP wins - usage: setpvpwins 50
   setpvplosses <n>: Set PvP losses - usage: setpvplosses 10
   resetpvp      : Reset all PvP stats to defaults
-  maxstats      : Max out everything
   unlockachall  : Unlock ALL achievements
   listach       : List achievements & status
-  prestige      : Force prestige (skip requirements)
   setkarma <n>  : Set karma level - usage: setkarma 100
   addluck <n>   : Add luck tokens - usage: addluck 5
   whoami        : Full player profile dump
-  nuke          : Factory reset ALL data (dangerous!)
   cls / clear   : Clear console output
   echo <text>   : Print text to console
   tp <n>        : Set target property count (1-15)
-  godroll       : Force next roll to be an instant win
-  bankrupt      : Set all currencies to 0
   rename <name> : Change display username
   speed <n>     : Set animation speed multiplier (1-10)
   listtournaments: Show tournament personal bests
   setplaytime <h>: Set play time in hours
   exportstats   : Dump full stats JSON to console
-  rain <n>      : SP rain - scatter N SP across currencies
-  lottery       : Spin a random reward
+  reload        : Reload all data from disk
+  listprops     : List all 15 possible string properties
+  filecheck     : Verify user data files
+  meminfo       : Show memory & object counts
+  eventlog      : Show last 20 session events
 
 Type 'help' to see this again.
 """
@@ -11546,10 +11536,6 @@ Type 'help' to see this again.
                 elif cmd == "listmodes":
                     modes = ["Classic", "Speed Run", "Hardcore", "Chaos", "Midnight", "Tournament"]
                     console_text.insert(tk.END, f"\n[MODES] {', '.join(modes)}")
-                elif cmd == "unlockall":
-                    self.wins_count = 500
-                    console_text.insert(tk.END, "\n[OK] All modes and features unlocked (500 wins granted)")
-                    self.wins_label.config(text=str(self.wins_count))
                 elif cmd == "saveforce":
                     self._save_stats()
                     self._save_achievements()
@@ -11561,30 +11547,12 @@ Type 'help' to see this again.
                         console_text.insert(tk.END, f"\n[OK] Simulating time: {time_str} (for testing midnight mode)")
                     except:
                         console_text.insert(tk.END, "\n[ERROR] Invalid format. Usage: time <hh:mm>")
-                elif cmd == "cheatmode":
-                    console_text.insert(tk.END, "\n[OK] Cheat mode toggled (grants infinite resources)")
-                    self.sp += 10000
-                    self.sp_plus += 10000
-                    self.sp_x += 10000
-                    self.sp_caret += 10000
-                    self._update_sp_label()
                 elif cmd == "reveal":
                     if self.target_properties:
                         props = ", ".join(sorted(self.target_properties))
                         console_text.insert(tk.END, f"\n[REVEAL] Target properties ({len(self.target_properties)}): {props}")
                     else:
                         console_text.insert(tk.END, "\n[WARN] No active round — target properties not set")
-                elif cmd == "autowin":
-                    if self.target_properties:
-                        self.wins_count += 1
-                        self.winning_streak += 1
-                        if self.winning_streak > self.max_winning_streak:
-                            self.max_winning_streak = self.winning_streak
-                        self.stats["total_wins"] = self.wins_count
-                        self.wins_label.config(text=str(self.wins_count))
-                        console_text.insert(tk.END, f"\n[OK] Auto-win! Wins: {self.wins_count}, Streak: {self.winning_streak}")
-                    else:
-                        console_text.insert(tk.END, "\n[WARN] No active round to win")
                 elif cmd.startswith("addxp "):
                     try:
                         amount = int(cmd.split()[1])
@@ -11649,24 +11617,6 @@ Type 'help' to see this again.
                     self.pvp_streak = 0
                     self.pvp_best_streak = 0
                     console_text.insert(tk.END, "\n[OK] All PvP stats reset to defaults (ELO 1000)")
-                elif cmd == "maxstats":
-                    self.player_level = 100
-                    self.player_xp = 0
-                    self.wins_count = 9999
-                    self.roll_count = 99999
-                    self.winning_streak = 999
-                    self.max_winning_streak = 999
-                    self.sp += 99999
-                    self.sp_plus += 9999
-                    self.sp_x += 9999
-                    self.sp_caret += 9999
-                    self.pvp_elo = 2500
-                    self.stats["total_wins"] = self.wins_count
-                    self.stats["total_rolls"] = self.roll_count
-                    self.wins_label.config(text=str(self.wins_count))
-                    self.roll_label.config(text=str(self.roll_count))
-                    self._update_sp_label()
-                    console_text.insert(tk.END, "\n[OK] All stats maxed out! You are a god now.")
                 elif cmd == "unlockachall":
                     count = 0
                     for k in self.achievements:
@@ -11682,12 +11632,6 @@ Type 'help' to see this again.
                         icon = "✅" if done else "❌"
                         name = ach.get("name", aid)
                         console_text.insert(tk.END, f"\n  {icon} {aid}: {name}")
-                elif cmd == "prestige":
-                    self.prestige_system["current_level"] = self.prestige_system.get("current_level", 0) + 1
-                    self.prestige_system["total_prestiges"] = self.prestige_system.get("total_prestiges", 0) + 1
-                    self.prestige_system["prestige_points"] = self.prestige_system.get("prestige_points", 0) + 10
-                    lvl = self.prestige_system["current_level"]
-                    console_text.insert(tk.END, f"\n[OK] Force-prestiged! Now Prestige Level {lvl} (+10 PP awarded)")
                 elif cmd.startswith("setkarma "):
                     try:
                         k = int(cmd.split()[1])
@@ -11764,16 +11708,6 @@ Type 'help' to see this again.
                             console_text.insert(tk.END, "\n[ERROR] Must be 1-15")
                     except Exception:
                         console_text.insert(tk.END, "\n[ERROR] Usage: tp <number 1-15>")
-                elif cmd == "godroll":
-                    self._dev_godroll = True
-                    console_text.insert(tk.END, "\n[OK] God roll armed! Your next roll will be an instant win. \u2728")
-                elif cmd == "bankrupt":
-                    self.sp = 0
-                    self.sp_plus = 0
-                    self.sp_x = 0
-                    self.sp_caret = 0
-                    self._update_sp_label()
-                    console_text.insert(tk.END, "\n[OK] All currencies set to 0. You are broke. \U0001f4b8")
                 elif cmd.startswith("rename "):
                     new_name = cmd[7:].strip()
                     if new_name:
@@ -11821,51 +11755,76 @@ Type 'help' to see this again.
                             "play_time_hours": round(self.stats.get("play_time", 0) / 3600, 2),
                             "stats": self.stats}
                     console_text.insert(tk.END, f"\n[EXPORT]\n{pprint.pformat(dump, width=60)}")
-                elif cmd.startswith("rain "):
+                elif cmd == "reload":
                     try:
-                        total = int(cmd.split()[1])
-                        if total <= 0:
-                            raise ValueError
-                        import random as _rng
-                        portions = [_rng.random() for _ in range(4)]
-                        s = sum(portions)
-                        portions = [int(total * p / s) for p in portions]
-                        portions[0] += total - sum(portions)  # remainder to SP
-                        self.sp += portions[0]
-                        self.sp_plus += portions[1]
-                        self.sp_x += portions[2]
-                        self.sp_caret += portions[3]
+                        self.stats = self._load_stats()
+                        self.achievements = self._load_achievements()
+                        self.equipment_inventory = self._load_equipment()
+                        self.rolls_history = self._load_history()
+                        self.roll_count = self.stats.get("total_rolls", 0)
+                        self.wins_count = self.stats.get("total_wins", 0)
+                        self.roll_label.config(text=str(self.roll_count))
+                        self.wins_label.config(text=str(self.wins_count))
                         self._update_sp_label()
-                        console_text.insert(tk.END, f"\n[\U0001f327\ufe0f RAIN] {total} SP scattered! SP+{portions[0]} SP++{portions[1]} SPx+{portions[2]} SP^+{portions[3]}")
-                    except Exception:
-                        console_text.insert(tk.END, "\n[ERROR] Usage: rain <positive_number>")
-                elif cmd == "lottery":
-                    import random as _rng
-                    roll = _rng.randint(1, 100)
-                    if roll <= 50:
-                        amt = _rng.randint(1, 100)
-                        self.sp += amt
-                        self._update_sp_label()
-                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] You won {amt} SP! (common)")
-                    elif roll <= 75:
-                        amt = _rng.randint(100, 500)
-                        self.sp += amt
-                        self._update_sp_label()
-                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] \u2b50 You won {amt} SP! (uncommon)")
-                    elif roll <= 90:
-                        amt = _rng.randint(50, 200)
-                        self.player_xp += amt
-                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] \U0001f31f You won {amt} XP! (rare)")
-                    elif roll <= 97:
-                        amt = _rng.randint(500, 1000)
-                        self.sp += amt
-                        self._update_sp_label()
-                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] \U0001f48e You won {amt} SP! (epic)")
+                        console_text.insert(tk.END, "\n[OK] Reloaded: stats, achievements, equipment, history from disk")
+                    except Exception as e:
+                        console_text.insert(tk.END, f"\n[ERROR] Reload failed: {e}")
+                elif cmd == "listprops":
+                    console_text.insert(tk.END, "\n[PROPERTIES] All 15 possible string properties:")
+                    for i, prop in enumerate(sorted(self.possible_properties), 1):
+                        display = self._property_name_display(prop) if hasattr(self, '_property_name_display') else prop
+                        console_text.insert(tk.END, f"\n  {i:2d}. {prop:25s} {display}")
+                elif cmd == "filecheck":
+                    user = self.current_username
+                    files_to_check = [
+                        f"user_{user}_stats.json", f"user_{user}_data.json",
+                        f"user_{user}_achievements.json", f"user_{user}_equipment.json",
+                        f"user_{user}_history.json", f"user_{user}_pvp.json",
+                        f"user_{user}_progression.json", f"user_{user}_strategy.json",
+                        f"user_{user}_tournament.json",
+                        "accounts.json", "shop_inventory.json", "game_settings.json",
+                    ]
+                    console_text.insert(tk.END, f"\n[FILECHECK] Checking data files for '{user}':")
+                    ok_count = 0
+                    for fp in files_to_check:
+                        if os.path.exists(fp):
+                            try:
+                                with open(fp, 'r') as f:
+                                    json.load(f)
+                                console_text.insert(tk.END, f"\n  \u2705 {fp} (valid JSON)")
+                                ok_count += 1
+                            except json.JSONDecodeError as e:
+                                console_text.insert(tk.END, f"\n  \u26a0\ufe0f {fp} (CORRUPT: {e})")
+                        else:
+                            console_text.insert(tk.END, f"\n  \u274c {fp} (missing)")
+                    console_text.insert(tk.END, f"\n  --- {ok_count}/{len(files_to_check)} files OK")
+                elif cmd == "meminfo":
+                    import sys
+                    obj_sizes = {
+                        "achievements": sys.getsizeof(self.achievements),
+                        "stats": sys.getsizeof(self.stats),
+                        "equipment_inventory": sys.getsizeof(self.equipment_inventory),
+                        "rolls_history": sys.getsizeof(getattr(self, 'rolls_history', [])),
+                        "specialization_trees": sys.getsizeof(self.specialization_trees),
+                        "prestige_system": sys.getsizeof(self.prestige_system),
+                        "rng_influence": sys.getsizeof(self.rng_influence),
+                        "investment_system": sys.getsizeof(self.investment_system),
+                        "tournament_data": sys.getsizeof(self.tournament_data),
+                    }
+                    total = sum(obj_sizes.values())
+                    console_text.insert(tk.END, f"\n[MEMORY] Top-level object sizes (shallow):")
+                    for name, size in sorted(obj_sizes.items(), key=lambda x: -x[1]):
+                        console_text.insert(tk.END, f"\n  {name:25s} {size:>8,} bytes")
+                    console_text.insert(tk.END, f"\n  {'TOTAL':25s} {total:>8,} bytes")
+                    console_text.insert(tk.END, f"\n  Python process: {sys.getsizeof(self):,} bytes (self)")
+                elif cmd == "eventlog":
+                    log = getattr(self, '_dev_event_log', [])
+                    if not log:
+                        console_text.insert(tk.END, "\n[EVENTLOG] No events recorded this session.")
                     else:
-                        self.winning_streak += 10
-                        if self.winning_streak > self.max_winning_streak:
-                            self.max_winning_streak = self.winning_streak
-                        console_text.insert(tk.END, f"\n[\U0001f3b0 LOTTERY] \U0001f525\U0001f525\U0001f525 JACKPOT! +10 streak! (legendary) Now: {self.winning_streak}")
+                        console_text.insert(tk.END, f"\n[EVENTLOG] Last {min(20, len(log))} events:")
+                        for entry in log[-20:]:
+                            console_text.insert(tk.END, f"\n  {entry}")
                 else:
                     console_text.insert(tk.END, f"\n[ERROR] Unknown command: '{cmd}'. Type 'help' for available commands")
                 
