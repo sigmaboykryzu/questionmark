@@ -1,8 +1,8 @@
-# Questionmark: The String Puzzle Game v1.70
+# Questionmark: The String Puzzle Game v2.0
 
-A strategic puzzle game where you deduce hidden properties of strings through intelligent guessing. Build your character, unlock equipment, and climb the leaderboards.
+A strategic puzzle game where you deduce hidden properties of strings through intelligent guessing. Build your character, unlock equipment, compete in PvP and tournaments, and climb the leaderboards.
 
-**NEW in v1.70**: Active Progression System - Progression now depends on SKILL, not just time!
+**NEW in v2.0**: Massive overhaul — Progression Hub, Tournament System, PvP Arena, Dev Console, and full UI revamp!
 
 ## Quick Start
 
@@ -17,26 +17,54 @@ python questionmark.py
 3. Guess the target properties correctly to win
 4. Earn SP and level up your character
 5. Craft equipment to enhance your abilities
+6. Challenge others in PvP or compete in tournaments
 
 ## Game Features
 
 ### Core Gameplay
-- **Strategic Properties** - 6+ unique string properties to analyze
-- **Multiple Difficulty Modes** - Safe, Balanced, Risky, Aggressive
-- **Equipment System** - Craft and equip powerful gear
-- **Tournaments** - Compete against challenges
-- **Auto-Roll** - Play hands-free (1-50 speed)
-- **Analytics** - Track all your stats
+- **15 String Properties** — Analyze and deduce hidden properties
+- **Multiple Difficulty Modes** — Safe, Balanced, Risky, Aggressive
+- **Equipment System** — Craft and equip powerful gear
+- **Auto-Roll** — Play hands-free (1-50 speed)
+- **Combo System** — Chain wins for up to 2.0x multiplier
 
-### v1.70 Features: Active Progression
-- **Combo System** - Chain wins for up to 2.0x multiplier
-- **Win Rate Bonuses** - 90% win rate = 2.0x XP (skill matters!)
-- **Critical Moments** - Random events during streaks reward alertness
-- **Daily Challenges** - Speed Demon, Precision Master, Streak King
-- **Strategic Decisions** - Between-roll choices that matter
-- **Playstyle Mastery** - Specialize for unique bonuses
-- **Talent Tree** - Invest SP into permanent upgrades
-- **Active Effects** - Session-based power-ups
+### 🏟️ PvP Arena
+- **Real-Time PvP** — Challenge other players head-to-head
+- **ELO Rating System** — Climb from Bronze to Grandmaster
+- **Bot Opponents** — 5 balanced bots for practice
+- **PvP Leaderboard** — Real players only, ranked by ELO
+
+### 🏆 Tournament System
+- **Speed Trial** — Win in as few rolls as possible
+- **Survival Gauntlet** — Survive as many rounds as you can
+- **Property Blitz** — Score points under time pressure
+- **Per-Mode Leaderboards** — Compete for personal bests
+
+### 📈 Progression Hub (6 Tabs)
+- **Overview** — Hero card with title, level, rank, key stats, active effects
+- **Stats** — Deep-dive into Core, Performance, PvP, Properties, Economy
+- **Progress** — Visual progress bars for XP, milestones, achievements, ELO
+- **Quests** — Daily quests with progress tracking and rewards
+- **Specializations** — Choose and switch between skill trees
+- **Prestige** — Reset for permanent bonuses and upgrades
+
+### 🎖️ Achievements & Leaderboards
+- **37 Achievements** — 8 categories with rarity tiers and SP rewards
+- **6-Tab Leaderboard** — Wins, Rolls, Level, Win Rate, Streak, ELO
+- **Next Achievement Tracker** — Widget on main screen
+
+### 🔧 Dev Console (DeMarcusThe2nd only)
+- **40+ Commands** — Full developer toolkit
+- **Data Inspection** — `whoami`, `exportstats`, `meminfo`, `filecheck`
+- **State Manipulation** — Set any stat, ELO, streak, SP, XP, level
+- **Diagnostics** — `listprops`, `listach`, `listtournaments`, `eventlog`, `reload`
+
+### UI & Quality of Life
+- **Modern Dark Theme** — Full styled UI with accent colors
+- **Navigation Ribbon** — One-click access to all windows
+- **Session Timer** — Track your play time
+- **Autosave** — Never lose progress
+- **Sound Effects** — Threaded audio (optional)
 
 ## Installation
 
@@ -57,4 +85,4 @@ MIT License - See LICENSE file for details
 
 ---
 
-Version 1.0.0 | Last Updated: April 2026
+Version 2.0 | Last Updated: April 2026
