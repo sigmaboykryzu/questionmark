@@ -14,10 +14,22 @@ user_*_test*.json
 *_test_*.json
 *test*.json
 
+# Runtime data files
+game_settings.json
+shop_inventory.json
+tournaments.json
+
 # Documentation (internal)
 BUG_FIX_REPORT.md
 UPDATES.md
+CHANGELOG.md
+MASSIVE_FEATURES_EXPANSION.md
+UPDATE_LOG.md
 index.html
+
+# Build artifacts
+*.spec
+*.mp3
 
 # Python
 __pycache__/
