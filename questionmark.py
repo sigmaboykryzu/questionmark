@@ -9550,41 +9550,403 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         self.root.destroy()
     
     def show_progression_window(self):
-        """Show player progression window"""
+        """Show the comprehensive player progression hub."""
         ui = self._ui
-        prog_window = self._styled_toplevel("📊 Progression", 450, 380)
-        
-        # Header
-        self._styled_header(prog_window, "Player Progression", subtitle="Your journey so far", icon="📊")
-        
-        # Progression info card
-        card_outer, card = self._styled_card(prog_window, "Current Status")
-        card_outer.pack(fill=tk.X, padx=20, pady=15)
-        
-        stats_data = [
-            ("⭐", "Level", str(self.player_level), ui["accent_light"]),
-            ("✨", "XP", f"{self.player_xp}/{self.xp_to_level_up}", ui["xp_color"]),
-            ("🏆", "Wins", str(self.wins_count), ui["gold"]),
-            ("🔥", "Streak", str(self.winning_streak), ui["warning"]),
-        ]
-        
-        for icon, label_text, value, color in stats_data:
-            row = tk.Frame(card, bg=ui["bg_card"])
-            row.pack(fill=tk.X, pady=4)
-            tk.Label(row, text=f"{icon}  {label_text}:", font=ui["font_body"],
-                     bg=ui["bg_card"], fg=ui["text_secondary"]).pack(side=tk.LEFT)
-            tk.Label(row, text=value, font=ui["font_body_bold"],
-                     bg=ui["bg_card"], fg=color).pack(side=tk.RIGHT)
-        
+        pw = self._styled_toplevel("📈 Progression Hub", width=880, height=740)
+        self._styled_header(pw, "Player Progression", "Your complete journey at a glance", icon="📈")
+
+        notebook = ttk.Notebook(pw, style="Modern.TNotebook")
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        # ── TAB 1 — Overview (Hero Card) ─────────────────────────────
+        ov_tab = tk.Frame(notebook, bg=ui["bg_primary"])
+        notebook.add(ov_tab, text="  🏠 Overview  ")
+
+        # ── Hero banner
+        hero = tk.Frame(ov_tab, bg=ui["bg_card"], padx=20, pady=14)
+        hero.pack(fill=tk.X, padx=12, pady=(12, 6))
+
+        title = self._get_player_title_for_wins(self.wins_count)
+        rank_name, rank_color = self._pvp_rank_for_elo(getattr(self, "pvp_elo", 1000))
+        tk.Label(hero, text=f"{title}  {self.current_username or 'Player'}",
+                 font=("Segoe UI", 20, "bold"), bg=ui["bg_card"], fg=ui["gold"]).pack(anchor="w")
+        tk.Label(hero, text=f"Level {self.player_level}  ·  {rank_name} ({getattr(self, 'pvp_elo', 1000)} ELO)",
+                 font=ui["font_body"], bg=ui["bg_card"], fg=rank_color).pack(anchor="w", pady=(2, 0))
+
         # XP progress bar
-        xp_frame = tk.Frame(card, bg=ui["bg_card"])
-        xp_frame.pack(fill=tk.X, pady=(10, 0))
-        progress_bg = tk.Frame(xp_frame, bg=ui["border"], height=8)
-        progress_bg.pack(fill=tk.X)
+        xp_bar_frame = tk.Frame(hero, bg=ui["bg_card"])
+        xp_bar_frame.pack(fill=tk.X, pady=(8, 0))
         xp_ratio = min(1.0, self.player_xp / max(1, self.xp_to_level_up))
-        progress_fill = tk.Frame(progress_bg, bg=ui["xp_color"], height=8,
-                                 width=int(xp_ratio * 380))
-        progress_fill.place(x=0, y=0)
+        tk.Label(xp_bar_frame, text=f"XP: {self.player_xp}/{self.xp_to_level_up}  ({xp_ratio:.0%})",
+                 font=ui["font_small"], bg=ui["bg_card"], fg=ui["xp_color"]).pack(anchor="w")
+        xp_bg = tk.Frame(xp_bar_frame, bg=ui["border"], height=10)
+        xp_bg.pack(fill=tk.X, pady=(2, 0))
+        xp_bg.update_idletasks()
+        xp_fill = tk.Frame(xp_bg, bg=ui["xp_color"], height=10)
+        xp_fill.place(x=0, y=0, relwidth=max(0.01, xp_ratio))
+
+        # ── Key stats grid (2 columns)
+        grid = tk.Frame(ov_tab, bg=ui["bg_primary"])
+        grid.pack(fill=tk.X, padx=12, pady=6)
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+
+        def _stat_card(parent, icon, label, value, color, r, c):
+            f = tk.Frame(parent, bg=ui["bg_card"], padx=12, pady=8)
+            f.grid(row=r, column=c, sticky="nsew", padx=4, pady=4)
+            tk.Label(f, text=f"{icon} {label}", font=ui["font_small"],
+                     bg=ui["bg_card"], fg=ui["text_muted"]).pack(anchor="w")
+            tk.Label(f, text=str(value), font=("Segoe UI", 18, "bold"),
+                     bg=ui["bg_card"], fg=color).pack(anchor="w")
+
+        _stat_card(grid, "🏆", "Total Wins",       self.wins_count, ui["gold"], 0, 0)
+        _stat_card(grid, "🎲", "Total Rolls",       self.roll_count, ui["info"], 0, 1)
+        _stat_card(grid, "🔥", "Current Streak",    self.winning_streak, ui["warning"], 1, 0)
+        _stat_card(grid, "⚡", "Best Streak",        self.max_winning_streak, ui["danger"], 1, 1)
+        _stat_card(grid, "💰", "SP",                 self.sp, ui["sp_color"], 2, 0)
+        pvp_elo = getattr(self, "pvp_elo", 1000)
+        _stat_card(grid, "⚔️", "PvP ELO",           pvp_elo, ui["accent_light"], 2, 1)
+
+        # ── Active Effects
+        effects_card = tk.Frame(ov_tab, bg=ui["bg_card"], padx=14, pady=8)
+        effects_card.pack(fill=tk.X, padx=12, pady=(4, 6))
+        tk.Label(effects_card, text="✨ Active Effects", font=ui["font_small_bold"],
+                 bg=ui["bg_card"], fg=ui["accent_light"]).pack(anchor="w")
+
+        active_effects = []
+        if self.current_specialization:
+            spec = self.specialization_trees.get(self.current_specialization, {})
+            active_effects.append(f"{spec.get('icon', '🔧')} Specialization: {spec.get('name', '?')}")
+        if self.rng_influence.get("ritual_system", {}).get("active_ritual"):
+            rk = self.rng_influence["ritual_system"]["active_ritual"]
+            rit = self.rng_influence["ritual_system"]["available_rituals"].get(rk, {})
+            active_effects.append(f"🕯️ Ritual: {rit.get('name', rk)}")
+        if self.temp_luck_boost > 0:
+            active_effects.append(f"🍀 Luck Boost: +{self.temp_luck_boost:.0%}")
+        if self.prestige_system.get("current_level", 0) > 0:
+            active_effects.append(f"♻️ Prestige Level {self.prestige_system['current_level']}")
+        if not active_effects:
+            active_effects.append("None — keep playing to earn effects!")
+        tk.Label(effects_card, text="  ·  ".join(active_effects), font=ui["font_small"],
+                 bg=ui["bg_card"], fg=ui["gold"]).pack(anchor="w", pady=(2, 0))
+
+        # ── TAB 2 — Stats Deep Dive ──────────────────────────────────
+        stats_tab = tk.Frame(notebook, bg=ui["bg_primary"])
+        notebook.add(stats_tab, text="  📊 Stats  ")
+
+        so, si = self._styled_scrollable(stats_tab, bg=ui["bg_primary"])
+        so.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        discoveries = self.stats.get("property_discoveries", {})
+        play_time = self.stats.get("play_time", 0) + (time.time() - self.stats.get("start_time", time.time()))
+        fastest = self.stats.get("fastest_win", float("inf"))
+        slowest = self.stats.get("slowest_win", 0)
+        avg_rpw = self.stats.get("avg_rolls_per_win", 0)
+        win_rate = (self.wins_count / max(1, self.roll_count)) * 100
+
+        stat_sections = [
+            ("🎯 Core Stats", [
+                ("Total Wins", str(self.wins_count)),
+                ("Total Rolls", str(self.roll_count)),
+                ("Win Rate", f"{win_rate:.1f}%"),
+                ("Best Streak", str(self.max_winning_streak)),
+                ("Current Streak", str(self.winning_streak)),
+            ]),
+            ("⏱️ Performance", [
+                ("Fastest Win", f"{fastest} rolls" if fastest != float("inf") else "—"),
+                ("Slowest Win", f"{slowest} rolls" if slowest > 0 else "—"),
+                ("Avg Rolls/Win", f"{avg_rpw:.1f}" if avg_rpw > 0 else "—"),
+                ("Play Time", f"{play_time / 3600:.1f} hours"),
+            ]),
+            ("⚔️ PvP", [
+                ("ELO Rating", str(getattr(self, "pvp_elo", 1000))),
+                ("PvP Wins", str(getattr(self, "pvp_wins", 0))),
+                ("PvP Losses", str(getattr(self, "pvp_losses", 0))),
+                ("PvP Best Streak", str(getattr(self, "pvp_best_streak", 0))),
+            ]),
+            ("🔬 Properties", [
+                ("Discovered", f"{len(discoveries)}/15"),
+            ]),
+            ("💰 Economy", [
+                ("Current SP", str(self.sp)),
+                ("SP+ Owned", str(self.sp_plus)),
+                ("SPx Owned", str(self.sp_x)),
+                ("SP^ Owned", str(self.sp_caret)),
+                ("Net Worth", str(self.sp + self.sp_plus * 10 + self.sp_x * 50 + self.sp_caret * 100)),
+                ("All-Time SP Earned", str(self.meta_progression.get("total_sp_earned_all_time", 0))),
+            ]),
+        ]
+
+        for section_title, rows in stat_sections:
+            sf = tk.Frame(si, bg=ui["bg_card"], padx=14, pady=8)
+            sf.pack(fill=tk.X, padx=8, pady=4)
+            tk.Label(sf, text=section_title, font=ui["font_subhead"],
+                     bg=ui["bg_card"], fg=ui["accent_light"]).pack(anchor="w", pady=(0, 4))
+            for lbl, val in rows:
+                row = tk.Frame(sf, bg=ui["bg_card"])
+                row.pack(fill=tk.X, pady=1)
+                tk.Label(row, text=lbl, font=ui["font_body"], bg=ui["bg_card"],
+                         fg=ui["text_secondary"]).pack(side=tk.LEFT)
+                tk.Label(row, text=val, font=ui["font_body_bold"], bg=ui["bg_card"],
+                         fg=ui["text_primary"]).pack(side=tk.RIGHT)
+
+        # ── TAB 3 — Progress Bars ────────────────────────────────────
+        prog_tab = tk.Frame(notebook, bg=ui["bg_primary"])
+        notebook.add(prog_tab, text="  📶 Progress  ")
+
+        po, pi = self._styled_scrollable(prog_tab, bg=ui["bg_primary"])
+        po.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        def _progress_bar(parent, label, current, maximum, color, extra_text=""):
+            pf = tk.Frame(parent, bg=ui["bg_card"], padx=14, pady=8)
+            pf.pack(fill=tk.X, padx=8, pady=3)
+            ratio = min(1.0, current / max(1, maximum))
+            hdr = tk.Frame(pf, bg=ui["bg_card"])
+            hdr.pack(fill=tk.X)
+            tk.Label(hdr, text=label, font=ui["font_body_bold"], bg=ui["bg_card"],
+                     fg=ui["text_primary"]).pack(side=tk.LEFT)
+            right_text = f"{current}/{maximum}  ({ratio:.0%})"
+            if extra_text:
+                right_text += f"  {extra_text}"
+            tk.Label(hdr, text=right_text, font=ui["font_small"], bg=ui["bg_card"],
+                     fg=color).pack(side=tk.RIGHT)
+            bar_bg = tk.Frame(pf, bg=ui["border"], height=12)
+            bar_bg.pack(fill=tk.X, pady=(4, 0))
+            bar_bg.update_idletasks()
+            bar_fill = tk.Frame(bar_bg, bg=color, height=12)
+            bar_fill.place(x=0, y=0, relwidth=max(0.005, ratio))
+
+        # XP to next level
+        _progress_bar(pi, "⭐ Level Progress", self.player_xp, self.xp_to_level_up, ui["xp_color"])
+
+        # Wins milestones
+        win_milestones = [10, 25, 50, 100, 250, 500, 1000]
+        next_wm = next((m for m in win_milestones if self.wins_count < m), 1000)
+        _progress_bar(pi, "🏆 Wins → Next Milestone", self.wins_count, next_wm, ui["gold"])
+
+        # Achievements
+        total_ach = len(self.achievements)
+        done_ach = sum(1 for a in self.achievements.values() if a.get("completed") or a.get("unlocked"))
+        _progress_bar(pi, "🎖️ Achievements", done_ach, total_ach, ui["warning"])
+
+        # Properties discovered
+        _progress_bar(pi, "🔬 Properties Discovered", len(discoveries), 15, ui["info"])
+
+        # PvP ELO milestones
+        elo_milestones = [("Bronze", 1000), ("Silver", 1100), ("Gold", 1200),
+                          ("Platinum", 1300), ("Diamond", 1400), ("Master", 1600), ("Legend", 1800)]
+        next_elo_name, next_elo_val = "Legend", 1800
+        for en, ev in elo_milestones:
+            if pvp_elo < ev:
+                next_elo_name, next_elo_val = en, ev
+                break
+        _progress_bar(pi, f"⚔️ ELO → {next_elo_name}", pvp_elo, next_elo_val, ui["accent_light"])
+
+        # Roll milestones
+        roll_milestones = [100, 500, 1000, 5000, 10000, 50000]
+        next_rm = next((m for m in roll_milestones if self.roll_count < m), 50000)
+        _progress_bar(pi, "🎲 Rolls → Next Milestone", self.roll_count, next_rm, ui["text_secondary"])
+
+        # Tournament personal bests
+        t_scores = self.tournament_data.get("scores", {})
+        for mode, icon, unit, goal in [("speed", "⚡", "rolls", 5), ("survival", "🛡️", "rounds", 10), ("blitz", "🔥", "pts", 50)]:
+            ms = t_scores.get(mode, {})
+            best = ms.get("best")
+            if best is not None:
+                if mode == "speed":
+                    _progress_bar(pi, f"{icon} Speed Trial Best", max(0, goal - best + goal), goal * 2, ui["warning"],
+                                  extra_text=f"({best} rolls)")
+                else:
+                    _progress_bar(pi, f"{icon} {mode.title()} Best", best, goal, ui["success"],
+                                  extra_text=f"(goal: {goal})")
+            else:
+                _progress_bar(pi, f"{icon} {mode.title()} (not played yet)", 0, goal, ui["text_muted"])
+
+        # ── TAB 4 — Quests ───────────────────────────────────────────
+        quests_tab = tk.Frame(notebook, bg=ui["bg_primary"])
+        notebook.add(quests_tab, text="  📜 Quests  ")
+
+        qo, qi = self._styled_scrollable(quests_tab, bg=ui["bg_primary"])
+        qo.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        if not self.active_quests:
+            tk.Label(qi, text="No active quests.\nClick below to generate daily quests!",
+                     font=ui["font_body"], bg=ui["bg_primary"], fg=ui["text_muted"]).pack(pady=30)
+        else:
+            for qid, quest in self.active_quests.items():
+                is_done = qid in self.completed_quests
+                qf = tk.Frame(qi, bg=ui["bg_card"], padx=14, pady=8)
+                qf.pack(fill=tk.X, padx=8, pady=3)
+                # Header row
+                hdr = tk.Frame(qf, bg=ui["bg_card"])
+                hdr.pack(fill=tk.X)
+                status_icon = "✅" if is_done else "⏳"
+                tk.Label(hdr, text=f"{status_icon} {quest['name']}",
+                         font=ui["font_body_bold"], bg=ui["bg_card"],
+                         fg=ui["success"] if is_done else ui["text_primary"]).pack(side=tk.LEFT)
+                tk.Label(hdr, text=quest.get("type", "").title(),
+                         font=ui["font_small"], bg=ui["bg_card"], fg=ui["info"]).pack(side=tk.RIGHT)
+                # Description
+                tk.Label(qf, text=quest.get("description", ""), font=ui["font_small"],
+                         bg=ui["bg_card"], fg=ui["text_secondary"], anchor="w").pack(fill=tk.X, pady=(2, 0))
+                # Progress bar
+                cur = quest.get("current", 0)
+                tgt = quest.get("target", 1)
+                ratio = min(1.0, cur / max(1, tgt))
+                prog_f = tk.Frame(qf, bg=ui["bg_card"])
+                prog_f.pack(fill=tk.X, pady=(4, 0))
+                bar_bg = tk.Frame(prog_f, bg=ui["border"], height=8)
+                bar_bg.pack(fill=tk.X)
+                bar_bg.update_idletasks()
+                bar_fill = tk.Frame(bar_bg, bg=ui["success"] if is_done else ui["info"], height=8)
+                bar_fill.place(x=0, y=0, relwidth=max(0.01, ratio))
+                tk.Label(prog_f, text=f"{cur}/{tgt}", font=ui["font_small"],
+                         bg=ui["bg_card"], fg=ui["text_muted"]).pack(anchor="e")
+                # Rewards
+                rwd_parts = []
+                if quest.get("reward_xp"):
+                    rwd_parts.append(f"+{quest['reward_xp']} XP")
+                if quest.get("reward_sp"):
+                    rwd_parts.append(f"+{quest['reward_sp']} SP")
+                if quest.get("reward_title"):
+                    rwd_parts.append(f'Title: "{quest["reward_title"]}"')
+                if rwd_parts:
+                    tk.Label(qf, text="  ".join(rwd_parts), font=ui["font_small"],
+                             bg=ui["bg_card"], fg=ui["gold"]).pack(anchor="w", pady=(2, 0))
+
+        # Generate quests button
+        btn_f = tk.Frame(quests_tab, bg=ui["bg_primary"])
+        btn_f.pack(fill=tk.X, padx=12, pady=8)
+        self._styled_button(btn_f, "🔄 Generate New Daily Quests",
+                            lambda: (self._generate_daily_quests(), pw.destroy(), self.show_progression_window()),
+                            style="info", width=24).pack()
+
+        # ── TAB 5 — Specializations ──────────────────────────────────
+        spec_tab = tk.Frame(notebook, bg=ui["bg_primary"])
+        notebook.add(spec_tab, text="  🔧 Specializations  ")
+
+        spo, spi = self._styled_scrollable(spec_tab, bg=ui["bg_primary"])
+        spo.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Current specialization banner
+        if self.current_specialization:
+            spec = self.specialization_trees.get(self.current_specialization, {})
+            cur_f = tk.Frame(spi, bg=ui["bg_card"], padx=14, pady=10)
+            cur_f.pack(fill=tk.X, padx=8, pady=6)
+            tk.Label(cur_f, text=f"{spec.get('icon', '🔧')} Active: {spec.get('name', '?')}",
+                     font=ui["font_heading"], bg=ui["bg_card"], fg=ui["success"]).pack(anchor="w")
+            tk.Label(cur_f, text=spec.get("description", ""), font=ui["font_small"],
+                     bg=ui["bg_card"], fg=ui["text_secondary"]).pack(anchor="w", pady=(2, 0))
+            # Passive bonuses
+            bonuses_text = []
+            for bk, bv in spec.get("passive_bonuses", {}).items():
+                bn = bk.replace("_", " ").title()
+                bonuses_text.append(f"{bn}: +{bv:.1%}" if isinstance(bv, float) and bv < 1 else f"{bn}: +{bv}")
+            if bonuses_text:
+                tk.Label(cur_f, text="Bonuses: " + "  ·  ".join(bonuses_text), font=ui["font_small"],
+                         bg=ui["bg_card"], fg=ui["gold"]).pack(anchor="w", pady=(4, 0))
+
+        # All specs
+        for spec_key, spec in self.specialization_trees.items():
+            sf = tk.Frame(spi, bg=ui["bg_card"], padx=14, pady=8)
+            sf.pack(fill=tk.X, padx=8, pady=3)
+            is_active = self.current_specialization == spec_key
+            is_unlocked = spec.get("unlocked", False)
+            # Header
+            hdr = tk.Frame(sf, bg=ui["bg_card"])
+            hdr.pack(fill=tk.X)
+            name_color = ui["success"] if is_active else ui["text_primary"] if is_unlocked else ui["text_muted"]
+            status = "✅ ACTIVE" if is_active else "🔓 Unlocked" if is_unlocked else f"🔒 {spec.get('unlock_cost', '?')} SP"
+            tk.Label(hdr, text=f"{spec.get('icon', '?')} {spec.get('name', spec_key)}",
+                     font=ui["font_body_bold"], bg=ui["bg_card"], fg=name_color).pack(side=tk.LEFT)
+            tk.Label(hdr, text=status, font=ui["font_small_bold"], bg=ui["bg_card"],
+                     fg=ui["success"] if is_active else ui["info"] if is_unlocked else ui["text_muted"]).pack(side=tk.RIGHT)
+            tk.Label(sf, text=spec.get("description", ""), font=ui["font_small"],
+                     bg=ui["bg_card"], fg=ui["text_secondary"]).pack(anchor="w", pady=(2, 0))
+            # Buttons
+            if not is_unlocked:
+                self._styled_button(sf, f"Unlock ({spec.get('unlock_cost', '?')} SP)",
+                                    lambda s=spec_key: (self._unlock_specialization(s), pw.destroy(), self.show_progression_window()),
+                                    style="warning", width=16, small=True).pack(anchor="w", pady=(4, 0))
+            elif not is_active:
+                self._styled_button(sf, "Select",
+                                    lambda s=spec_key: (self._switch_specialization(s), pw.destroy(), self.show_progression_window()),
+                                    style="primary", width=10, small=True).pack(anchor="w", pady=(4, 0))
+
+        # ── TAB 6 — Prestige ─────────────────────────────────────────
+        prest_tab = tk.Frame(notebook, bg=ui["bg_primary"])
+        notebook.add(prest_tab, text="  ♻️ Prestige  ")
+
+        prest_level = self.prestige_system.get("current_level", 0)
+        prest_pts = self.prestige_system.get("prestige_points", 0)
+        perm_bonuses = self.prestige_system.get("permanent_bonuses", {})
+
+        # Prestige status card
+        ps_card = tk.Frame(prest_tab, bg=ui["bg_card"], padx=18, pady=12)
+        ps_card.pack(fill=tk.X, padx=12, pady=(12, 6))
+        tk.Label(ps_card, text=f"♻️ Prestige Level {prest_level}",
+                 font=("Segoe UI", 20, "bold"), bg=ui["bg_card"],
+                 fg=ui["gold"] if prest_level > 0 else ui["text_muted"]).pack(anchor="w")
+        tk.Label(ps_card, text=f"Prestige Points: {prest_pts} PP  ·  Total Prestiges: {self.prestige_system.get('total_prestiges', 0)}",
+                 font=ui["font_body"], bg=ui["bg_card"], fg=ui["sp_color"]).pack(anchor="w", pady=(2, 0))
+
+        if perm_bonuses:
+            bonuses_text = "  ·  ".join(f"{k.replace('_', ' ').title()}: +{v}%" for k, v in perm_bonuses.items())
+            tk.Label(ps_card, text=f"Permanent Bonuses:  {bonuses_text}", font=ui["font_small"],
+                     bg=ui["bg_card"], fg=ui["success"]).pack(anchor="w", pady=(4, 0))
+
+        # Requirements
+        req_card = tk.Frame(prest_tab, bg=ui["bg_card"], padx=18, pady=10)
+        req_card.pack(fill=tk.X, padx=12, pady=4)
+        tk.Label(req_card, text="⚡ Prestige Requirements", font=ui["font_subhead"],
+                 bg=ui["bg_card"], fg=ui["accent_light"]).pack(anchor="w", pady=(0, 4))
+
+        total_wins_at = self.meta_progression.get("total_wins_all_time", 0)
+        req_data = [
+            ("Total Wins ≥ 1000", total_wins_at >= 1000, f"{total_wins_at}/1000"),
+            ("Level ≥ 25", self.player_level >= 25, f"{self.player_level}/25"),
+        ]
+        can_prestige = all(ok for _, ok, _ in req_data)
+        for req_name, met, progress in req_data:
+            rf = tk.Frame(req_card, bg=ui["bg_card"])
+            rf.pack(fill=tk.X, pady=1)
+            icon = "✅" if met else "❌"
+            tk.Label(rf, text=f"  {icon} {req_name}", font=ui["font_body"], bg=ui["bg_card"],
+                     fg=ui["success"] if met else ui["danger"]).pack(side=tk.LEFT)
+            tk.Label(rf, text=progress, font=ui["font_mono_sm"], bg=ui["bg_card"],
+                     fg=ui["text_secondary"]).pack(side=tk.RIGHT)
+
+        if can_prestige:
+            self._styled_button(req_card, "⚡ PRESTIGE RESET",
+                                lambda: (self._perform_prestige_reset(), pw.destroy(), self.show_progression_window()),
+                                style="warning", width=18).pack(anchor="w", pady=(8, 0))
+        else:
+            tk.Label(req_card, text="Keep playing to unlock prestige!",
+                     font=ui["font_small"], bg=ui["bg_card"], fg=ui["text_muted"]).pack(anchor="w", pady=(6, 0))
+
+        # Prestige upgrades
+        pup_outer, pup_inner = self._styled_scrollable(prest_tab, bg=ui["bg_primary"])
+        pup_outer.pack(fill=tk.BOTH, expand=True, padx=12, pady=(4, 8))
+        tk.Label(pup_inner, text="🛒 Prestige Upgrades", font=ui["font_subhead"],
+                 bg=ui["bg_primary"], fg=ui["accent_light"]).pack(anchor="w", padx=8, pady=(4, 4))
+
+        for upg_key, upg in self.prestige_system.get("available_upgrades", {}).items():
+            uf = tk.Frame(pup_inner, bg=ui["bg_card"], padx=12, pady=6)
+            uf.pack(fill=tk.X, padx=8, pady=2)
+            purchased = upg.get("purchased", False)
+            hdr = tk.Frame(uf, bg=ui["bg_card"])
+            hdr.pack(fill=tk.X)
+            tk.Label(hdr, text=upg.get("name", upg_key), font=ui["font_body_bold"], bg=ui["bg_card"],
+                     fg=ui["success"] if purchased else ui["text_primary"]).pack(side=tk.LEFT)
+            status_txt = "✅ Purchased" if purchased else f"{upg.get('cost', '?')} PP"
+            tk.Label(hdr, text=status_txt, font=ui["font_small_bold"], bg=ui["bg_card"],
+                     fg=ui["success"] if purchased else ui["warning"]).pack(side=tk.RIGHT)
+            tk.Label(uf, text=upg.get("description", ""), font=ui["font_small"],
+                     bg=ui["bg_card"], fg=ui["text_secondary"]).pack(anchor="w", pady=(2, 0))
+            if not purchased and prest_pts >= upg.get("cost", 999999):
+                self._styled_button(uf, "Purchase",
+                                    lambda u=upg_key: (self._purchase_prestige_upgrade(u), pw.destroy(), self.show_progression_window()),
+                                    style="success", width=10, small=True).pack(anchor="w", pady=(4, 0))
     
     def show_equipment_window(self):
         """Show equipment crafting window"""
