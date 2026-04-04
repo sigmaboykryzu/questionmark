@@ -564,6 +564,14 @@ class RollingGame:
     
     def _add_xp(self, amount):
         """Add XP and handle leveling"""
+        # If called from a background thread, defer to main thread for Tkinter safety
+        try:
+            if threading.current_thread() is not threading.main_thread():
+                self.root.after(0, lambda a=amount: self._add_xp(a))
+                return
+        except Exception:
+            pass
+        
         xp_boost = 1.0 + (self.meta_progression.get("level", 1) * 0.02)  # Skill tree bonus
         total_xp = int(amount * xp_boost)
         self.player_xp += total_xp
@@ -3351,21 +3359,35 @@ Playstyle Mastery:
                 tokens = 0
             self.tokens_display_label.config(text=f"🍀 Tokens: {tokens}")
         
-        # Show/hide reroll button based on level
+        # Show/hide reroll button based on level — use pack() to match how buttons were created
         if hasattr(self, 'reroll_button'):
             unlocked = self.mechanic_unlocks.get("strategy_guide", {}).get("unlocked", False)
             if unlocked:
-                self.reroll_button.grid()
+                try:
+                    if not self.reroll_button.winfo_ismapped():
+                        self.reroll_button.pack(side=tk.RIGHT, padx=3)
+                except Exception:
+                    pass
             else:
-                self.reroll_button.grid_remove()
+                try:
+                    self.reroll_button.pack_forget()
+                except Exception:
+                    pass
         
-        # Show/hide scanner button based on quest unlock
+        # Show/hide scanner button based on quest unlock — use pack() to match how buttons were created
         if hasattr(self, 'scanner_button'):
             unlocked = self.mechanic_unlocks.get("quest_system", {}).get("unlocked", False)
             if unlocked:
-                self.scanner_button.grid()
+                try:
+                    if not self.scanner_button.winfo_ismapped():
+                        self.scanner_button.pack(side=tk.RIGHT, padx=3)
+                except Exception:
+                    pass
             else:
-                self.scanner_button.grid_remove()
+                try:
+                    self.scanner_button.pack_forget()
+                except Exception:
+                    pass
         
         if not hasattr(self, 'unlock_progress_label'):
             return
