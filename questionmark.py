@@ -8418,6 +8418,39 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                         if any(p["username"] == self.current_username for p in tournament.get("participants", [])):
                             self.submit_tournament_score(tournament["id"], tournament_score)
             
+                    # === Pokédex, Clan XP, Crafting (same as manual_roll) ===
+                    try:
+                        self._record_pokedex_entry(s, properties)
+                    except Exception:
+                        pass
+                    try:
+                        self._contribute_clan_xp(sp_gained)
+                    except Exception:
+                        pass
+                    try:
+                        self._check_crafting_discoveries(properties)
+                    except Exception:
+                        pass
+                    try:
+                        self._update_progression_after_roll(True, sp_gained, xp_earned)
+                    except Exception:
+                        pass
+
+                    # Update stats tracking
+                    self.stats['current_streak'] += 1
+                    self.stats['best_streak'] = max(self.stats['best_streak'], self.stats['current_streak'])
+
+                    # Batch save every 10 wins to avoid excessive IO
+                    if self.wins_count % 10 == 0:
+                        try:
+                            self._save_stats()
+                            self._save_achievements()
+                            self._save_equipment()
+                            self._save_challenge_progress()
+                            self._save_pokedex()
+                        except Exception:
+                            pass
+
                     # Update daily challenges and get rewards
                     challenge_rewards = self._update_challenges(sp_type, len(s))
                     reward_text = ""
@@ -10186,12 +10219,59 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         self._update_display("", set())
     
     def quit_game(self):
-        """Save game state and quit the application"""
-        self._save_stats()
-        self._save_achievements()
-        self._save_equipment()
-        self._save_settings()
-        self._save_pvp_data()
+        """Save ALL game state and quit the application"""
+        try:
+            self._save_stats()
+        except Exception:
+            pass
+        try:
+            self._save_achievements()
+        except Exception:
+            pass
+        try:
+            self._save_equipment()
+        except Exception:
+            pass
+        try:
+            self._save_settings()
+        except Exception:
+            pass
+        try:
+            self._save_pvp_data()
+        except Exception:
+            pass
+        try:
+            self._save_meta_progression()
+        except Exception:
+            pass
+        try:
+            self._save_challenge_progress()
+        except Exception:
+            pass
+        try:
+            self._save_pokedex()
+        except Exception:
+            pass
+        try:
+            self._save_strategy_data()
+        except Exception:
+            pass
+        try:
+            self._save_clan_data()
+        except Exception:
+            pass
+        try:
+            self._save_progression_data()
+        except Exception:
+            pass
+        try:
+            self._save_history()
+        except Exception:
+            pass
+        try:
+            self._auto_save()
+        except Exception:
+            pass
         self.root.destroy()
     
     def show_progression_window(self):
@@ -11824,7 +11904,126 @@ STRATEGY TIPS:
 """
         summary_text.insert(1.0, summary_info)
         summary_text.config(state=tk.DISABLED)
-    
+
+        # ===== STRATEGY GUIDE TAB (read-only tutorial) =====
+        guide_frame = tk.Frame(notebook, bg=ui["bg_card"])
+        notebook.add(guide_frame, text="📖 Strategy Guide")
+
+        guide_text = tk.Text(guide_frame, bg=ui["bg_input"], fg=ui["text_primary"], font=ui["font_mono"],
+                             height=20, width=80, wrap=tk.WORD, padx=12, pady=10)
+        guide_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        guide_content = """
+╔════════════════════════════════════════════╗
+║     📖  STRATEGY GUIDE  —  READ ME!     ║
+╚════════════════════════════════════════════╝
+
+─── WHAT ARE STRATEGIES? ───────────────────────
+
+Strategies are your pre-roll configuration that
+determines how much SP you earn and how hard
+each roll is. Think of it as a risk/reward dial.
+
+  ⚠️  Higher risk = higher SP multiplier
+  ⚠️  Higher risk = harder properties to match
+  ⚠️  Some strategies cost SP per roll!
+
+
+─── THE FOUR STRATEGIES ────────────────────────
+
+  🛡️  SAFE  (1.0× SP, Easy, Free)
+     Best for beginners. No cost, steady wins.
+     Ideal when starting out or rebuilding SP.
+
+  ⚖️  BALANCED  (1.3× SP, Medium, 5 SP/roll)
+     The sweet spot. Costs a little SP per roll
+     but you earn more per win (+10 SP bonus).
+     Recommended once you have 100+ SP banked.
+
+  🎲  RISKY  (1.8× SP, Hard, 15 SP/roll)
+     For experienced players. High SP gain but
+     you bleed SP fast if you hit a dry streak.
+     Win bonus: +30 SP. Use with streak talents.
+
+  🔥  AGGRESSIVE  (2.5× SP, Nightmare, 40 SP/roll)
+     Maximum reward, maximum pain. Only use this
+     if you have deep SP reserves and maxed
+     talents. Win bonus: +75 SP.
+
+
+─── TALENT TREE EXPLAINED ───────────────────────
+
+Talents are permanent upgrades you buy with SP.
+Each branch has 3 levels. They synergize with
+your chosen strategy.
+
+  🎯  Precision Mastery (Detection)
+     Boosts property detection. Helps you see
+     more matching properties per roll. Great
+     for every build.
+
+  💰  Efficiency Expert (SP Gains)
+     Flat % increase to all SP earned. Stacks
+     with strategy multipliers. Priority #1
+     for long-term growth.
+
+  🍀  Fortune Seeker (Luck)  [Unlocks at 5 wins]
+     Increases chance of matching properties.
+     Directly improves your win rate.
+
+  🔥  Streak Specialist (Momentum)  [Unlocks at 10 wins]
+     Boosts streak bonuses. If you maintain
+     a 3+ win streak, this multiplies the
+     bonus SP dramatically.
+
+  💡 TIP: Max Efficiency first, then Fortune,
+     then spec into the build that fits your
+     playstyle.
+
+
+─── ACTIVE EFFECTS ─────────────────────────────
+
+Effects are temporary session boosts you toggle
+on or off. Each costs SP per session (paid once
+when you activate it).
+
+  🎯  Focus Mode (10 SP)  — +25% detection
+  ✨  Luck Cascade (15 SP) — 1.5× streak mult
+  ⚡  Sharpness (12 SP)    — -20% noise props
+  💪  Empowerment (20 SP)  — 2× win bonuses
+
+  💡 TIP: Stack Luck Cascade + Streak Specialist
+     for insane streak bonuses. Pair Empowerment
+     with Aggressive strategy for massive SP.
+
+
+─── RECOMMENDED BUILDS ─────────────────────────
+
+  🌱 Beginner Build:
+     Strategy: Safe → Balanced
+     Talents: Efficiency Lv2 → Precision Lv1
+     Effects: Focus Mode
+
+  ⚔️ Grinder Build:
+     Strategy: Balanced
+     Talents: Efficiency Lv3 → Fortune Lv3
+     Effects: Focus Mode + Empowerment
+
+  🚀 High-Roller Build:
+     Strategy: Aggressive
+     Talents: Streak Lv3 → Efficiency Lv3
+     Effects: Luck Cascade + Empowerment
+
+  🏆 Balanced Pro Build:
+     Strategy: Risky
+     Talents: All at Lv2+
+     Effects: All four active
+
+═════════════════════════════════════════════
+"""
+        guide_text.insert(1.0, guide_content)
+        guide_text.config(state=tk.DISABLED)
+
     def show_analytics_window(self):
         """Show analytics window"""
         ui = self._ui
