@@ -344,6 +344,7 @@ class RollingGame:
         # Tournament System
         self.tournament_data = {}
         self._load_tournaments()
+        self.tournament_whitelist = self._load_json("tournament_whitelist.json", {"allowed_players": [], "enabled": True})
         
         # Strategy System
         self._init_strategy_system()
@@ -4896,6 +4897,24 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         """Save tournament data"""
         self._save_json("tournaments.json", self.tournament_data)
     
+    def _is_tournament_allowed(self, username=None):
+        """Check if a player is allowed to participate in tournaments.
+        Returns (allowed: bool, reason: str)"""
+        username = username or self.current_username
+        wl = self.tournament_whitelist
+        if not wl.get("enabled", True):
+            return True, "Tournament whitelist is disabled — everyone can play"
+        allowed = wl.get("allowed_players", [])
+        if not allowed:
+            return True, "No restrictions — whitelist is empty"
+        if username in allowed:
+            return True, f"{username} is whitelisted for tournaments"
+        return False, f"⛔ {username} is not approved for tournaments.\nOnly developer-approved players can participate.\nContact an admin to request access."
+
+    def _save_tournament_whitelist(self):
+        """Save the tournament whitelist to disk"""
+        self._save_json("tournament_whitelist.json", self.tournament_whitelist)
+
     def create_tournament(self, name, entry_fee=50, max_players=16, duration_days=7):
         """Create a new tournament"""
         tournament = {
@@ -4920,6 +4939,11 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
     
     def join_tournament(self, tournament_id):
         """Join a tournament"""
+        # Check whitelist
+        allowed, reason = self._is_tournament_allowed()
+        if not allowed:
+            return False, reason
+        
         tournament = None
         for t in self.tournament_data["active_tournaments"]:
             if t["id"] == tournament_id:
@@ -10801,6 +10825,29 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
     def show_tournament_window(self):
         """Show the playable tournaments hub with real gameplay modes."""
         ui = self._ui
+        
+        # Check tournament whitelist
+        allowed, reason = self._is_tournament_allowed()
+        if not allowed:
+            blocked_win = self._styled_toplevel("⚔️ Tournaments — Restricted", width=500, height=350)
+            self._styled_header(blocked_win, "Tournaments", "Restricted Access", icon="🔒")
+            
+            msg_frame = tk.Frame(blocked_win, bg=ui["bg_card"], padx=30, pady=30)
+            msg_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+            tk.Label(msg_frame, text="🔒", font=("Segoe UI", 48), bg=ui["bg_card"],
+                     fg=ui["danger"]).pack(pady=(10, 5))
+            tk.Label(msg_frame, text="TOURNAMENT ACCESS RESTRICTED", font=ui["font_heading"],
+                     bg=ui["bg_card"], fg=ui["danger"]).pack()
+            tk.Label(msg_frame, text=reason, font=ui["font_body"],
+                     bg=ui["bg_card"], fg=ui["text_secondary"], wraplength=400,
+                     justify=tk.CENTER).pack(pady=(12, 0))
+            tk.Label(msg_frame, text="Only players approved by a developer\ncan enter tournaments and championships.",
+                     font=ui["font_small"], bg=ui["bg_card"], fg=ui["text_muted"],
+                     justify=tk.CENTER).pack(pady=(16, 0))
+            self._styled_button(msg_frame, "Close", blocked_win.destroy,
+                                style="secondary", width=12).pack(pady=(16, 0))
+            return
+        
         tw = self._styled_toplevel("⚔️ Tournaments", width=820, height=680)
         self._styled_header(tw, "Tournaments", "Real competitive challenges with SP prizes", icon="⚔️")
 
@@ -11057,6 +11104,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
 
     def _tournament_speed_trial(self, parent_win):
         """Playable speed trial — match the target in as few rolls as possible."""
+        allowed, reason = self._is_tournament_allowed()
+        if not allowed:
+            messagebox.showerror("Tournament Restricted", reason)
+            return
         ui = self._ui
         parent_win.destroy()
         win = self._styled_toplevel("⚡ Speed Trial", 750, 560)
@@ -11171,6 +11222,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
     # ── Tournament: Survival Gauntlet ────────────────────────────────
 
     def _tournament_survival(self, parent_win):
+        allowed, reason = self._is_tournament_allowed()
+        if not allowed:
+            messagebox.showerror("Tournament Restricted", reason)
+            return
         """Playable survival — win consecutive rounds with limited rolls each."""
         ui = self._ui
         parent_win.destroy()
@@ -11314,6 +11369,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
     # ── Tournament: Property Blitz ───────────────────────────────────
 
     def _tournament_blitz(self, parent_win):
+        allowed, reason = self._is_tournament_allowed()
+        if not allowed:
+            messagebox.showerror("Tournament Restricted", reason)
+            return
         """Playable blitz — 60-second timed challenge, score as many points as possible."""
         ui = self._ui
         parent_win.destroy()
@@ -12515,6 +12574,10 @@ DISCOVERY STATS:
             ("startbot [name]", "Start a bot player that simulates real gameplay (default: BotPlayer)"),
             ("stopbot [name]", "Stop a running bot player"),
             ("listbots", "List all currently running bot players"),
+            ("tournamentallow <user>", "Whitelist a player for tournament access"),
+            ("tournamentrevoke <user>", "Remove a player from tournament whitelist"),
+            ("tournamentlist", "Show all whitelisted tournament players"),
+            ("tournamenttoggle", "Enable/disable the tournament whitelist system"),
         ]
         
         for cmd, desc in commands_list:
@@ -12628,6 +12691,10 @@ DISCOVERY STATS:
   startbot [name]: Start a bot player (default: BotPlayer)
   stopbot [name] : Stop a running bot player
   listbots       : List all running bots
+  tournamentallow <user>: Whitelist player for tournaments
+  tournamentrevoke <user>: Remove player from whitelist
+  tournamentlist : Show all whitelisted players
+  tournamenttoggle: Enable/disable whitelist system
 
 Type 'help' to see this again.
 """
@@ -13069,6 +13136,63 @@ Type 'help' to see this again.
                             sf = f"user_{name}_stats.json"
                             bs = self._load_json(sf, {})
                             console_text.insert(tk.END, f"\n  🤖 {name}  —  Rolls: {bs.get('total_rolls', 0):,}  Wins: {bs.get('total_wins', 0):,}")
+                elif cmd.startswith("tournamentallow "):
+                    try:
+                        target = cmd.split(None, 1)[1].strip()
+                        accounts = self.account_manager._load_accounts()
+                        if target not in accounts:
+                            console_text.insert(tk.END, f"\n[ERROR] User '{target}' does not exist.")
+                        else:
+                            wl = self.tournament_whitelist
+                            allowed = wl.get("allowed_players", [])
+                            if target in allowed:
+                                console_text.insert(tk.END, f"\n[WARN] '{target}' is already whitelisted for tournaments.")
+                            else:
+                                allowed.append(target)
+                                wl["allowed_players"] = allowed
+                                self._save_tournament_whitelist()
+                                console_text.insert(tk.END, f"\n[OK] ✅ '{target}' has been approved for tournaments!")
+                                console_text.insert(tk.END, f"\n     Whitelisted players: {len(allowed)}")
+                    except (IndexError, ValueError):
+                        console_text.insert(tk.END, "\n[ERROR] Usage: tournamentallow <username>")
+                elif cmd.startswith("tournamentrevoke "):
+                    try:
+                        target = cmd.split(None, 1)[1].strip()
+                        wl = self.tournament_whitelist
+                        allowed = wl.get("allowed_players", [])
+                        if target not in allowed:
+                            console_text.insert(tk.END, f"\n[WARN] '{target}' is not on the tournament whitelist.")
+                        else:
+                            allowed.remove(target)
+                            wl["allowed_players"] = allowed
+                            self._save_tournament_whitelist()
+                            console_text.insert(tk.END, f"\n[OK] ❌ '{target}' has been removed from tournament access.")
+                            console_text.insert(tk.END, f"\n     Whitelisted players: {len(allowed)}")
+                    except (IndexError, ValueError):
+                        console_text.insert(tk.END, "\n[ERROR] Usage: tournamentrevoke <username>")
+                elif cmd == "tournamentlist":
+                    wl = self.tournament_whitelist
+                    enabled = wl.get("enabled", True)
+                    allowed = wl.get("allowed_players", [])
+                    status = "🟢 ENABLED" if enabled else "🔴 DISABLED (everyone can play)"
+                    console_text.insert(tk.END, f"\n[TOURNAMENT WHITELIST] Status: {status}")
+                    if not allowed:
+                        console_text.insert(tk.END, "\n  (empty) — No restrictions, all players can join.")
+                    else:
+                        console_text.insert(tk.END, f"\n  Approved players ({len(allowed)}):")
+                        for i, name in enumerate(allowed, 1):
+                            console_text.insert(tk.END, f"\n    {i}. {name}")
+                elif cmd == "tournamenttoggle":
+                    wl = self.tournament_whitelist
+                    wl["enabled"] = not wl.get("enabled", True)
+                    self._save_tournament_whitelist()
+                    state_str = "ENABLED" if wl["enabled"] else "DISABLED"
+                    emoji = "🟢" if wl["enabled"] else "🔴"
+                    console_text.insert(tk.END, f"\n[OK] {emoji} Tournament whitelist is now {state_str}.")
+                    if wl["enabled"]:
+                        console_text.insert(tk.END, "\n     Only whitelisted players can participate.")
+                    else:
+                        console_text.insert(tk.END, "\n     All players can now freely join tournaments.")
                 else:
                     console_text.insert(tk.END, f"\n[ERROR] Unknown command: '{cmd}'. Type 'help' for available commands")
                 
