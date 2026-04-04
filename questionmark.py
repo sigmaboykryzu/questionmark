@@ -9401,7 +9401,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
     # ── Arena Window ─────────────────────────────────────────────────
 
     def show_pvp_arena(self):
-        """Open the PvP Arena hub – bots, player challenges, rankings, history."""
+        """Open the PvP Arena hub – player challenges, rankings, history."""
         ui = self._ui
         arena = self._styled_toplevel("🏟️ PvP Arena", 860, 700, 720, 580)
         self._styled_header(arena, "PvP Arena", "Challenge opponents and climb the ladder", icon="🏟️")
@@ -9424,35 +9424,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                      font=ui["font_mono_sm"], bg=ui["bg_card"], fg=ui["text_secondary"]
                      ).pack(side=tk.RIGHT)
 
-        # ── TAB 1 — Fight Bots ───────────────────────────────────────
-        fight_tab = tk.Frame(notebook, bg=ui["bg_primary"])
-        notebook.add(fight_tab, text="  🤖 Bots  ")
-
-        _player_card(fight_tab)
-
-        tk.Label(fight_tab, text="AI Opponents — great for practice:", font=ui["font_subhead"],
-                 bg=ui["bg_primary"], fg=ui["text_primary"]).pack(anchor="w", padx=18, pady=(12, 4))
-
-        opp_frame = tk.Frame(fight_tab, bg=ui["bg_primary"])
-        opp_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 12))
-
-        for opp in self.pvp_opponents:
-            row = tk.Frame(opp_frame, bg=ui["bg_card"], pady=8, padx=14)
-            row.pack(fill=tk.X, pady=3)
-            opp_rank, opp_color = self._pvp_rank_for_elo(opp["elo"])
-            tk.Label(row, text=f'{opp["icon"]}  {opp["name"]}', font=ui["font_body_bold"],
-                     bg=ui["bg_card"], fg=ui["text_primary"]).pack(side=tk.LEFT)
-            tk.Label(row, text=f'ELO {opp["elo"]}  ·  {opp_rank}', font=ui["font_small"],
-                     bg=ui["bg_card"], fg=opp_color).pack(side=tk.LEFT, padx=14)
-            tk.Label(row, text=opp["desc"], font=ui["font_small"],
-                     bg=ui["bg_card"], fg=ui["text_muted"]).pack(side=tk.LEFT, padx=8)
-            elo_delta = self._pvp_elo_change(self.pvp_elo, opp["elo"], 1)
-            gain_text = f"+{elo_delta}" if elo_delta > 0 else str(elo_delta)
-            self._styled_button(row, f"⚔️ Fight ({gain_text})",
-                                lambda o=opp: self._pvp_start_draft(arena, o),
-                                style="danger", width=14, small=True).pack(side=tk.RIGHT)
-
-        # ── TAB 2 — Challenge Player ─────────────────────────────────
+        # ── TAB 1 — Challenge Player ─────────────────────────────────
         player_tab = tk.Frame(notebook, bg=ui["bg_primary"])
         notebook.add(player_tab, text="  👥 Challenge Player  ")
 
@@ -9478,6 +9450,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             opponents = []
             for username in self.account_manager.accounts:
                 if username.startswith("Guest_") or username == self.current_username:
+                    continue
+                # Exclude bot accounts from the player list
+                acct_data = self.account_manager.accounts.get(username, {})
+                if acct_data.get("title") in ("🤖 Bot", "🤖 testbot", "testbot"):
                     continue
                 pvp_file = f"user_{username}_pvp.json"
                 stats_file = self.account_manager.get_user_stats_file(username)
@@ -9549,7 +9525,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         pvp_search_var.trace_add("write", _fill_player_list)
         _fill_player_list()
 
-        # ── TAB 3 — Abilities ────────────────────────────────────────
+        # ── TAB 2 — Abilities ────────────────────────────────────────
         abil_tab = tk.Frame(notebook, bg=ui["bg_primary"])
         notebook.add(abil_tab, text="  🎯 Abilities  ")
 
@@ -9575,7 +9551,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             tk.Label(af, text=status_text, font=ui["font_small_bold"],
                      bg=ui["bg_card"], fg=status_color).pack(side=tk.RIGHT)
 
-        # ── TAB 4 — History ──────────────────────────────────────────
+        # ── TAB 3 — History ──────────────────────────────────────────
         hist_tab = tk.Frame(notebook, bg=ui["bg_primary"])
         notebook.add(hist_tab, text="  📜 History  ")
 
@@ -9604,13 +9580,13 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                 tk.Label(mf, text=ec_text, font=ui["font_small_bold"], bg=ui["bg_card"],
                          fg=ec_color).pack(side=tk.RIGHT, padx=4)
 
-        # ── TAB 5 — PvP Leaderboard (real players only) ─────────────
+        # ── TAB 4 — PvP Leaderboard (real players only) ─────────────
         pvp_lb_tab = tk.Frame(notebook, bg=ui["bg_primary"])
         notebook.add(pvp_lb_tab, text="  🏆 PvP Leaderboard  ")
 
         tk.Label(pvp_lb_tab, text="PvP Leaderboard — Real Players Only", font=ui["font_heading"],
                  bg=ui["bg_primary"], fg=ui["gold"]).pack(anchor="w", padx=18, pady=(15, 4))
-        tk.Label(pvp_lb_tab, text="Ranked by ELO. Bots are not shown.",
+        tk.Label(pvp_lb_tab, text="Ranked by ELO.",
                  font=ui["font_small"], bg=ui["bg_primary"], fg=ui["text_muted"]
                  ).pack(anchor="w", padx=18, pady=(0, 10))
 
@@ -9674,7 +9650,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                 tk.Label(row, text=f"🔥{pl['best_streak']}", font=ui["font_small"], bg=row_bg,
                          fg=ui["warning"]).pack(side=tk.RIGHT, padx=(0, 8))
 
-        # ── TAB 6 — Rank Tiers ──────────────────────────────────────
+        # ── TAB 5 — Rank Tiers ──────────────────────────────────────
         rank_tab = tk.Frame(notebook, bg=ui["bg_primary"])
         notebook.add(rank_tab, text="  📊 Ranks  ")
 
