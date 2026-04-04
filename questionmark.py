@@ -12493,6 +12493,7 @@ DISCOVERY STATS:
             ("filecheck", "Verify all user data files exist and are valid JSON"),
             ("meminfo", "Show memory usage and object counts"),
             ("eventlog", "Show last 20 game events from this session"),
+            ("spectateuser <user>", "Open live read-only spectator view of a player's game"),
         ]
         
         for cmd, desc in commands_list:
@@ -12602,6 +12603,7 @@ DISCOVERY STATS:
   filecheck     : Verify user data files
   meminfo       : Show memory & object counts
   eventlog      : Show last 20 session events
+  spectateuser <u>: Open live spectator view of a player's game
 
 Type 'help' to see this again.
 """
@@ -13000,6 +13002,27 @@ Type 'help' to see this again.
                         console_text.insert(tk.END, f"\n[EVENTLOG] Last {min(20, len(log))} events:")
                         for entry in log[-20:]:
                             console_text.insert(tk.END, f"\n  {entry}")
+                elif cmd.startswith("spectateuser "):
+                    try:
+                        target = cmd.split(None, 1)[1].strip()
+                        if not target:
+                            raise ValueError("empty")
+                        # Check if the account exists
+                        accounts = self.account_manager._load_accounts()
+                        if target not in accounts:
+                            console_text.insert(tk.END, f"\n[ERROR] User '{target}' does not exist.")
+                        elif target == self.current_username:
+                            console_text.insert(tk.END, "\n[ERROR] You can't spectate yourself. Just look at your own screen.")
+                        else:
+                            # Check if they have data files
+                            stats_file = f"user_{target}_stats.json"
+                            if not os.path.exists(stats_file):
+                                console_text.insert(tk.END, f"\n[WARN] User '{target}' has no saved data yet (never played).")
+                            else:
+                                console_text.insert(tk.END, f"\n[OK] Opening spectator view for '{target}'...")
+                                self._spectate_user(target)
+                    except (IndexError, ValueError):
+                        console_text.insert(tk.END, "\n[ERROR] Usage: spectateuser <username>")
                 else:
                     console_text.insert(tk.END, f"\n[ERROR] Unknown command: '{cmd}'. Type 'help' for available commands")
                 
@@ -13009,6 +13032,338 @@ Type 'help' to see this again.
         
         execute_btn = self._styled_button(cmd_input_frame, "Execute", execute_command, style="success", width=10, small=True)
         execute_btn.pack(side=tk.LEFT, padx=5)
+    
+    def _spectate_user(self, target_username):
+        """Open a read-only spectator window showing another user's game state.
+        Auto-refreshes every 2 seconds by re-reading their save files."""
+        ui = self._ui
+        spec_win = self._styled_toplevel(f"👁️ SPECTATING: {target_username}", 920, 750,
+                                          min_width=800, min_height=600)
+        
+        # Header
+        self._styled_header(spec_win, f"SPECTATING — {target_username}",
+                            subtitle="Read-only view · Auto-refreshes every 2s · You cannot interact",
+                            icon="👁️")
+        
+        # Live indicator bar
+        live_bar = tk.Frame(spec_win, bg="#ff1744", height=28)
+        live_bar.pack(fill=tk.X)
+        live_bar.pack_propagate(False)
+        live_label = tk.Label(live_bar, text="🔴 LIVE  —  Spectator Mode  —  All interactions disabled",
+                              font=("Segoe UI", 9, "bold"), bg="#ff1744", fg="#ffffff")
+        live_label.pack(expand=True)
+        
+        # Scrollable body
+        scroll_outer, body = self._styled_scrollable(spec_win, ui["bg_primary"])
+        
+        # ── Helper to load target user's files ────────────────────────────
+        def _load_target_data():
+            """Load all data files for the target user"""
+            data = {}
+            # Stats
+            sf = f"user_{target_username}_stats.json"
+            data["stats"] = self._load_json(sf, {
+                "total_rolls": 0, "total_wins": 0, "best_streak": 0,
+                "current_streak": 0, "fastest_win": None, "slowest_win": 0,
+                "avg_rolls_per_win": 0, "property_discoveries": {}, "play_time": 0
+            })
+            # Data (progression, prestige, etc.)
+            df = f"user_{target_username}_data.json"
+            data["user_data"] = self._load_json(df, {})
+            # Achievements
+            af = f"user_{target_username}_achievements.json"
+            data["achievements"] = self._load_json(af, {})
+            # Equipment
+            ef = f"user_{target_username}_equipment.json"
+            data["equipment"] = self._load_json(ef, {"owned": [], "equipped": {}})
+            # History
+            hf = f"user_{target_username}_history.json"
+            data["history"] = self._load_json(hf, [])
+            # PvP
+            pf = f"user_{target_username}_pvp.json"
+            data["pvp"] = self._load_json(pf, {})
+            # Progression
+            pgf = f"user_{target_username}_progression.json"
+            data["progression"] = self._load_json(pgf, {})
+            # Strategy
+            stf = f"user_{target_username}_strategy.json"
+            data["strategy"] = self._load_json(stf, {})
+            return data
+        
+        # ── Content frames dictionary for refresh ─────────────────────────
+        sections = {}
+        
+        def _card(parent, title, icon="📋"):
+            """Create a styled info card that returns (outer_frame, content_frame)"""
+            card = tk.Frame(parent, bg=ui["bg_card"], bd=0)
+            card.pack(fill=tk.X, padx=10, pady=5)
+            # Header
+            hdr = tk.Frame(card, bg=ui["bg_card"])
+            hdr.pack(fill=tk.X)
+            tk.Frame(hdr, bg=ui["accent"], width=4).pack(side=tk.LEFT, fill=tk.Y)
+            tk.Label(hdr, text=f"  {icon}  {title}", font=ui["font_subhead"],
+                     bg=ui["bg_card"], fg=ui["accent_light"]).pack(side=tk.LEFT, padx=8, pady=6)
+            tk.Frame(card, bg=ui["border"], height=1).pack(fill=tk.X)
+            inner = tk.Frame(card, bg=ui["bg_card"])
+            inner.pack(fill=tk.X, padx=12, pady=8)
+            return card, inner
+        
+        def _info_row(parent, label, value, val_color=None):
+            """Add a label: value row"""
+            row = tk.Frame(parent, bg=ui["bg_card"])
+            row.pack(fill=tk.X, pady=1)
+            tk.Label(row, text=label, font=ui["font_body"], bg=ui["bg_card"],
+                     fg=ui["text_secondary"], width=22, anchor="w").pack(side=tk.LEFT)
+            tk.Label(row, text=str(value), font=ui["font_body_bold"], bg=ui["bg_card"],
+                     fg=val_color or ui["text_primary"], anchor="w").pack(side=tk.LEFT, padx=(4, 0))
+        
+        # ── Build sections ────────────────────────────────────────────────
+        # Profile card
+        _, sections["profile"] = _card(body, "PLAYER PROFILE", "👤")
+        # Stats card
+        _, sections["stats"] = _card(body, "GAME STATISTICS", "📊")
+        # Currency card
+        _, sections["currency"] = _card(body, "CURRENCY", "💎")
+        # PvP card
+        _, sections["pvp"] = _card(body, "PVP ARENA", "⚔️")
+        # Achievements card
+        _, sections["achievements"] = _card(body, "ACHIEVEMENTS", "🏆")
+        # Equipment card
+        _, sections["equipment"] = _card(body, "EQUIPMENT", "🛡️")
+        # Recent History card
+        _, sections["history"] = _card(body, "RECENT ROLL HISTORY (Last 15)", "📜")
+        # Progression card
+        _, sections["progression"] = _card(body, "PROGRESSION", "📈")
+        # Live Activity card
+        _, sections["activity"] = _card(body, "LIVE ACTIVITY FEED", "📡")
+        
+        # ── Refresh / populate function ───────────────────────────────────
+        _prev_data = {"hash": None}  # Track changes
+        
+        def _populate():
+            """Load data and populate all sections"""
+            if not spec_win.winfo_exists():
+                return
+            
+            data = _load_target_data()
+            stats = data["stats"]
+            user_data = data["user_data"]
+            achievements = data["achievements"]
+            equipment = data["equipment"]
+            history = data["history"]
+            pvp_data = data["pvp"]
+            progression = data["progression"]
+            
+            # Simple change detection — hash the stats to see if anything moved
+            import hashlib as _hl
+            snap = str(stats.get("total_rolls", 0)) + str(stats.get("total_wins", 0)) + str(len(history))
+            new_hash = _hl.md5(snap.encode()).hexdigest()
+            changed = (new_hash != _prev_data["hash"])
+            _prev_data["hash"] = new_hash
+            
+            # ── Clear & repopulate each section ───────────────────────
+            for key in sections:
+                for w in sections[key].winfo_children():
+                    w.destroy()
+            
+            # — Profile —
+            sec = sections["profile"]
+            wins = stats.get("total_wins", 0)
+            rolls = stats.get("total_rolls", 0)
+            level = user_data.get("player_level", user_data.get("level", 1))
+            xp = user_data.get("player_xp", user_data.get("xp", 0))
+            title = self._get_player_title_for_wins(wins)
+            # Override title for DeMarcusThe2nd
+            if target_username == "DeMarcusThe2nd":
+                title = "👑 The One And Only"
+            
+            accounts = self.account_manager._load_accounts()
+            acct = accounts.get(target_username, {})
+            created = acct.get("created", "Unknown")
+            last_played = acct.get("last_played", "Unknown")
+            
+            _info_row(sec, "Username:", target_username, ui["accent_light"])
+            _info_row(sec, "Title:", title, ui["gold"])
+            _info_row(sec, "Level:", level, ui["xp_color"])
+            _info_row(sec, "XP:", xp, ui["xp_color"])
+            _info_row(sec, "Account Created:", created, ui["text_secondary"])
+            _info_row(sec, "Last Played:", last_played, ui["text_secondary"])
+            
+            # — Stats —
+            sec = sections["stats"]
+            play_time_s = stats.get("play_time", 0)
+            play_h = int(play_time_s // 3600)
+            play_m = int((play_time_s % 3600) // 60)
+            fastest = stats.get("fastest_win")
+            if fastest is None or fastest == float('inf'):
+                fastest_str = "N/A"
+            else:
+                fastest_str = f"{int(fastest)} rolls"
+            slowest = stats.get("slowest_win", 0)
+            avg_rpw = stats.get("avg_rolls_per_win", 0)
+            best_streak = stats.get("best_streak", 0)
+            cur_streak = stats.get("current_streak", 0)
+            discoveries = len(stats.get("property_discoveries", {}))
+            
+            _info_row(sec, "Total Wins:", f"{wins:,}", ui["success"])
+            _info_row(sec, "Total Rolls:", f"{rolls:,}", ui["gold"])
+            _info_row(sec, "Win Rate:", f"{(wins / rolls * 100):.1f}%" if rolls > 0 else "N/A", ui["info"])
+            _info_row(sec, "Best Streak:", best_streak, ui["warning"])
+            _info_row(sec, "Current Streak:", cur_streak, ui["success"] if cur_streak > 0 else ui["text_muted"])
+            _info_row(sec, "Fastest Win:", fastest_str, ui["info"])
+            _info_row(sec, "Slowest Win:", f"{slowest} rolls" if slowest else "N/A", ui["danger"])
+            _info_row(sec, "Avg Rolls/Win:", f"{avg_rpw:.1f}" if avg_rpw else "N/A", ui["accent_light"])
+            _info_row(sec, "Properties Found:", f"{discoveries}/15", ui["info"])
+            _info_row(sec, "Play Time:", f"{play_h}h {play_m}m", ui["text_secondary"])
+            
+            # — Currency —
+            sec = sections["currency"]
+            sp = user_data.get("sp", stats.get("sp", 0))
+            sp_plus = user_data.get("sp_plus", stats.get("sp_plus", 0))
+            sp_x = user_data.get("sp_x", stats.get("sp_x", 0))
+            sp_caret = user_data.get("sp_caret", stats.get("sp_caret", 0))
+            _info_row(sec, "SP (regular):", f"{sp:,}", ui["sp_color"])
+            _info_row(sec, "SP+ (10-char):", f"{sp_plus:,}", ui["sp_color"])
+            _info_row(sec, "SPx (20-char):", f"{sp_x:,}", ui["sp_color"])
+            _info_row(sec, "SP^ (40+-char):", f"{sp_caret:,}", ui["sp_color"])
+            
+            # — PvP —
+            sec = sections["pvp"]
+            elo = pvp_data.get("elo", pvp_data.get("pvp_elo", 1000))
+            pvp_w = pvp_data.get("wins", pvp_data.get("pvp_wins", 0))
+            pvp_l = pvp_data.get("losses", pvp_data.get("pvp_losses", 0))
+            pvp_d = pvp_data.get("draws", pvp_data.get("pvp_draws", 0))
+            pvp_best = pvp_data.get("best_streak", pvp_data.get("pvp_best_streak", 0))
+            rank_name, rank_color = self._pvp_rank_for_elo(elo)
+            
+            _info_row(sec, "ELO Rating:", f"{elo}", rank_color)
+            _info_row(sec, "Rank:", rank_name, rank_color)
+            _info_row(sec, "PvP Wins:", pvp_w, ui["success"])
+            _info_row(sec, "PvP Losses:", pvp_l, ui["danger"])
+            _info_row(sec, "PvP Draws:", pvp_d, ui["text_muted"])
+            _info_row(sec, "Best PvP Streak:", pvp_best, ui["warning"])
+            wr = (pvp_w / (pvp_w + pvp_l) * 100) if (pvp_w + pvp_l) > 0 else 0
+            _info_row(sec, "PvP Win Rate:", f"{wr:.1f}%", ui["info"])
+            
+            # — Achievements —
+            sec = sections["achievements"]
+            ach_done = sum(1 for a in achievements.values() 
+                         if isinstance(a, dict) and (a.get("completed") or a.get("unlocked")))
+            ach_total = len(achievements)
+            
+            summary_row = tk.Frame(sec, bg=ui["bg_card"])
+            summary_row.pack(fill=tk.X, pady=(0, 4))
+            tk.Label(summary_row, text=f"Unlocked: {ach_done}/{ach_total}", 
+                     font=ui["font_body_bold"], bg=ui["bg_card"], fg=ui["gold"]).pack(side=tk.LEFT)
+            if ach_total > 0:
+                pct = ach_done / ach_total * 100
+                tk.Label(summary_row, text=f"  ({pct:.0f}%)", font=ui["font_body"],
+                         bg=ui["bg_card"], fg=ui["text_secondary"]).pack(side=tk.LEFT)
+            
+            # Show recent unlocks (up to 8)
+            unlocked = [(k, v) for k, v in achievements.items() 
+                       if isinstance(v, dict) and (v.get("completed") or v.get("unlocked"))]
+            rarity_colors = {"common": "#9aa0a6", "rare": "#00b0ff", "epic": "#b388ff", "legendary": "#ffd740"}
+            for aid, ach in unlocked[:8]:
+                rarity = ach.get("rarity", "common")
+                r_col = rarity_colors.get(rarity, ui["text_secondary"])
+                name = ach.get("name", aid)
+                r_tag = f"[{rarity.upper()}]"
+                ach_row = tk.Frame(sec, bg=ui["bg_card"])
+                ach_row.pack(fill=tk.X, pady=1)
+                tk.Label(ach_row, text=f"  ✅ {name}", font=ui["font_small"], 
+                         bg=ui["bg_card"], fg=ui["text_primary"]).pack(side=tk.LEFT)
+                tk.Label(ach_row, text=f"  {r_tag}", font=ui["font_small"],
+                         bg=ui["bg_card"], fg=r_col).pack(side=tk.LEFT)
+            if len(unlocked) > 8:
+                tk.Label(sec, text=f"  ... and {len(unlocked) - 8} more", font=ui["font_small"],
+                         bg=ui["bg_card"], fg=ui["text_muted"]).pack(anchor="w")
+            
+            # — Equipment —
+            sec = sections["equipment"]
+            owned = equipment.get("owned", [])
+            equipped = equipment.get("equipped", {})
+            _info_row(sec, "Items Owned:", len(owned), ui["info"])
+            _info_row(sec, "Items Equipped:", len(equipped), ui["success"])
+            if equipped:
+                for slot, item_id in equipped.items():
+                    _info_row(sec, f"  {slot.title()}:", item_id, ui["accent_light"])
+            if owned and not equipped:
+                # Show up to 5 owned items
+                for item in owned[:5]:
+                    item_name = item if isinstance(item, str) else str(item)
+                    _info_row(sec, "  Owned:", item_name, ui["text_secondary"])
+                if len(owned) > 5:
+                    tk.Label(sec, text=f"  ... and {len(owned) - 5} more items", font=ui["font_small"],
+                             bg=ui["bg_card"], fg=ui["text_muted"]).pack(anchor="w")
+            
+            # — Recent History —
+            sec = sections["history"]
+            recent = history[-15:] if history else []
+            if not recent:
+                tk.Label(sec, text="No roll history yet.", font=ui["font_body"],
+                         bg=ui["bg_card"], fg=ui["text_muted"]).pack(anchor="w")
+            else:
+                for i, entry in enumerate(reversed(recent)):
+                    h_row = tk.Frame(sec, bg=ui["bg_secondary"] if i % 2 == 0 else ui["bg_card"])
+                    h_row.pack(fill=tk.X, pady=1)
+                    
+                    won = entry.get("won", False)
+                    icon = "✅" if won else "❌"
+                    s = entry.get("string", "???")
+                    if len(s) > 35:
+                        s = s[:32] + "..."
+                    matches = entry.get("matches", 0)
+                    total_n = entry.get("total_needed", 0)
+                    ts = entry.get("timestamp", "")
+                    sp_earned = entry.get("sp_earned", 0)
+                    
+                    bg = h_row.cget("bg")
+                    tk.Label(h_row, text=f" {icon}", font=ui["font_small"], bg=bg,
+                             fg=ui["success"] if won else ui["danger"]).pack(side=tk.LEFT)
+                    tk.Label(h_row, text=f' "{s}"', font=("Consolas", 8), bg=bg,
+                             fg=ui["text_primary"]).pack(side=tk.LEFT, padx=(4, 0))
+                    tk.Label(h_row, text=f" [{matches}/{total_n}]", font=ui["font_small"], bg=bg,
+                             fg=ui["info"]).pack(side=tk.LEFT, padx=(4, 0))
+                    if sp_earned:
+                        tk.Label(h_row, text=f" +{sp_earned}SP", font=ui["font_small_bold"], bg=bg,
+                                 fg=ui["sp_color"]).pack(side=tk.LEFT, padx=(4, 0))
+                    if ts:
+                        tk.Label(h_row, text=f"  {ts}", font=("Consolas", 7), bg=bg,
+                                 fg=ui["text_muted"]).pack(side=tk.RIGHT, padx=4)
+            
+            # — Progression —
+            sec = sections["progression"]
+            prestige = progression.get("prestige_level", progression.get("current_level", 0))
+            spec = user_data.get("current_specialization", progression.get("specialization", "None"))
+            game_mode = user_data.get("current_game_mode", user_data.get("game_mode", "Classic"))
+            difficulty = user_data.get("difficulty", "normal")
+            
+            _info_row(sec, "Prestige Level:", prestige, ui["gold"] if prestige > 0 else ui["text_muted"])
+            _info_row(sec, "Specialization:", spec or "None", ui["accent_light"])
+            _info_row(sec, "Game Mode:", game_mode, ui["warning"])
+            _info_row(sec, "Difficulty:", difficulty.title() if difficulty else "Normal", ui["info"])
+            
+            # — Activity Feed —
+            sec = sections["activity"]
+            if changed and _prev_data["hash"] is not None:
+                activity_text = f"⚡ Activity detected! Stats updated at {datetime.datetime.now().strftime('%H:%M:%S')}"
+                tk.Label(sec, text=activity_text, font=ui["font_body_bold"],
+                         bg=ui["bg_card"], fg=ui["success"]).pack(anchor="w")
+            else:
+                tk.Label(sec, text="Watching for changes... (refreshes every 2s)",
+                         font=ui["font_body"], bg=ui["bg_card"], fg=ui["text_muted"]).pack(anchor="w")
+            
+            # Update live indicator pulse
+            if changed:
+                live_label.config(text=f"🔴 LIVE  —  Activity detected at {datetime.datetime.now().strftime('%H:%M:%S')}  —  Spectating {target_username}")
+            
+            # Schedule next refresh
+            if spec_win.winfo_exists():
+                spec_win.after(2000, _populate)
+        
+        # Initial populate
+        _populate()
     
     def _calculate_sp(self, string_length):
         """Calculate SP type and display name based on string length"""
