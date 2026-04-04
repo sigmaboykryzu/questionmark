@@ -12494,6 +12494,9 @@ DISCOVERY STATS:
             ("meminfo", "Show memory usage and object counts"),
             ("eventlog", "Show last 20 game events from this session"),
             ("spectateuser <user>", "Open live read-only spectator view of a player's game"),
+            ("startbot [name]", "Start a bot player that simulates real gameplay (default: BotPlayer)"),
+            ("stopbot [name]", "Stop a running bot player"),
+            ("listbots", "List all currently running bot players"),
         ]
         
         for cmd, desc in commands_list:
@@ -12604,6 +12607,9 @@ DISCOVERY STATS:
   meminfo       : Show memory & object counts
   eventlog      : Show last 20 session events
   spectateuser <u>: Open live spectator view of a player's game
+  startbot [name]: Start a bot player (default: BotPlayer)
+  stopbot [name] : Stop a running bot player
+  listbots       : List all running bots
 
 Type 'help' to see this again.
 """
@@ -13023,6 +13029,28 @@ Type 'help' to see this again.
                                 self._spectate_user(target)
                     except (IndexError, ValueError):
                         console_text.insert(tk.END, "\n[ERROR] Usage: spectateuser <username>")
+                elif cmd == "startbot" or cmd.startswith("startbot "):
+                    parts = cmd.split(None, 1)
+                    bot_name = parts[1].strip() if len(parts) > 1 else "BotPlayer"
+                    ok, msg = self._start_bot_player(bot_name)
+                    tag = "[OK]" if ok else "[ERROR]"
+                    console_text.insert(tk.END, f"\n{tag} {msg}")
+                elif cmd == "stopbot" or cmd.startswith("stopbot "):
+                    parts = cmd.split(None, 1)
+                    bot_name = parts[1].strip() if len(parts) > 1 else "BotPlayer"
+                    ok, msg = self._stop_bot_player(bot_name)
+                    tag = "[OK]" if ok else "[ERROR]"
+                    console_text.insert(tk.END, f"\n{tag} {msg}")
+                elif cmd == "listbots":
+                    bots = getattr(self, '_bot_threads', {})
+                    if not bots:
+                        console_text.insert(tk.END, "\n[BOTS] No bots are currently running.")
+                    else:
+                        console_text.insert(tk.END, f"\n[BOTS] {len(bots)} bot(s) running:")
+                        for name in bots:
+                            sf = f"user_{name}_stats.json"
+                            bs = self._load_json(sf, {})
+                            console_text.insert(tk.END, f"\n  🤖 {name}  —  Rolls: {bs.get('total_rolls', 0):,}  Wins: {bs.get('total_wins', 0):,}")
                 else:
                     console_text.insert(tk.END, f"\n[ERROR] Unknown command: '{cmd}'. Type 'help' for available commands")
                 
@@ -13365,7 +13393,413 @@ Type 'help' to see this again.
         # Initial populate
         _populate()
     
-    def _calculate_sp(self, string_length):
+    def _start_bot_player(self, bot_name="BotPlayer"):
+        """Start a bot that simulates a real player — rolls, wins, earns SP, crafts, etc.
+        Runs in a background thread, saving to user files so spectateuser can watch it live."""
+        import threading
+        
+        # Prevent duplicate bots
+        if hasattr(self, '_bot_threads') and bot_name in self._bot_threads:
+            return False, f"Bot '{bot_name}' is already running."
+        if not hasattr(self, '_bot_threads'):
+            self._bot_threads = {}
+        
+        # Register bot account if it doesn't exist
+        accounts = self.account_manager._load_accounts()
+        if bot_name not in accounts:
+            accounts[bot_name] = {
+                "password_hash": self.account_manager._hash_password("bot_password_123"),
+                "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "last_played": None,
+                "play_time": 0,
+                "title": "Bot"
+            }
+            self.account_manager.accounts = accounts
+            self.account_manager._save_accounts()
+        
+        # Stop flag
+        stop_event = threading.Event()
+        self._bot_threads[bot_name] = stop_event
+        
+        def _bot_loop():
+            """Background bot simulation loop"""
+            possible_properties = [
+                "has_numbers", "has_symbols", "has_uppercase", "has_lowercase", "is_long",
+                "has_spaces", "has_operators", "has_multiple_words", "has_repeats",
+                "starts_with_letter", "ends_with_symbol", "has_punctuation", "has_vowels",
+                "is_very_long", "has_consecutive_letters"
+            ]
+            
+            rarity_tiers = ["common", "rare", "epic", "legendary"]
+            
+            # Default achievements catalogue (same as main game)
+            default_achievements = {
+                "first_win":       {"unlocked": False, "name": "First Victory",     "desc": "Win your first sequence",            "rarity": "common",    "category": "wins",       "reward": 5,    "goal": 1},
+                "ten_wins":        {"unlocked": False, "name": "Dedicated Player",  "desc": "Win 10 sequences",                   "rarity": "common",    "category": "wins",       "reward": 15,   "goal": 10},
+                "fifty_wins":      {"unlocked": False, "name": "Master Deductor",   "desc": "Win 50 sequences",                   "rarity": "rare",      "category": "wins",       "reward": 50,   "goal": 50},
+                "hundred_wins":    {"unlocked": False, "name": "Centurion",         "desc": "Win 100 sequences",                  "rarity": "epic",      "category": "wins",       "reward": 150,  "goal": 100},
+                "fivehundred_wins":{"unlocked": False, "name": "Unstoppable Force", "desc": "Win 500 sequences",                  "rarity": "legendary", "category": "wins",       "reward": 500,  "goal": 500},
+                "hundred_rolls":   {"unlocked": False, "name": "Getting Started",   "desc": "Make 100 rolls",                     "rarity": "common",    "category": "rolls",      "reward": 5,    "goal": 100},
+                "fivehundred_rolls":{"unlocked": False,"name": "Automation Expert", "desc": "Make 500 rolls",                     "rarity": "common",    "category": "rolls",      "reward": 10,   "goal": 500},
+                "thousand_rolls":  {"unlocked": False, "name": "Obsessed",          "desc": "Make 1,000 rolls",                   "rarity": "rare",      "category": "rolls",      "reward": 30,   "goal": 1000},
+                "perfectionist":   {"unlocked": False, "name": "Perfectionist",     "desc": "Win 3 in a row",                     "rarity": "common",    "category": "streaks",    "reward": 10,   "goal": 3},
+                "streak_breaker":  {"unlocked": False, "name": "Streak Breaker",    "desc": "Win 5 in a row",                     "rarity": "rare",      "category": "streaks",    "reward": 30,   "goal": 5},
+                "on_fire":         {"unlocked": False, "name": "On Fire",           "desc": "Win 10 in a row",                    "rarity": "epic",      "category": "streaks",    "reward": 75,   "goal": 10},
+                "speed_demon":     {"unlocked": False, "name": "Speed Demon",       "desc": "Win in under 30 rolls",              "rarity": "common",    "category": "speed",      "reward": 10,   "goal": 30},
+                "lightning":       {"unlocked": False, "name": "Lightning Fast",    "desc": "Win in under 10 rolls",              "rarity": "rare",      "category": "speed",      "reward": 40,   "goal": 10},
+                "sp_collector":    {"unlocked": False, "name": "SP Collector",      "desc": "Accumulate 50 SP",                   "rarity": "common",    "category": "currency",   "reward": 10,   "goal": 50},
+                "sp_hoarder":      {"unlocked": False, "name": "SP Hoarder",        "desc": "Accumulate 500 SP",                  "rarity": "rare",      "category": "currency",   "reward": 25,   "goal": 500},
+                "property_master": {"unlocked": False, "name": "Property Spotter",  "desc": "Discover 10 unique properties",      "rarity": "common",    "category": "exploration","reward": 10,   "goal": 10},
+                "explorer":        {"unlocked": False, "name": "Property Explorer", "desc": "Discover all 15 properties",         "rarity": "epic",      "category": "exploration","reward": 75,   "goal": 15},
+                "first_craft":     {"unlocked": False, "name": "Apprentice Smith",  "desc": "Craft your first equipment",         "rarity": "common",    "category": "equipment",  "reward": 10,   "goal": 1},
+                "pvp_debut":       {"unlocked": False, "name": "Arena Debut",       "desc": "Win your first PvP duel",            "rarity": "common",    "category": "pvp",        "reward": 15,   "goal": 1},
+                "night_owl":       {"unlocked": False, "name": "Night Owl",         "desc": "Play between 12 AM and 6 AM",        "rarity": "rare",      "category": "special",    "reward": 20,   "goal": 1},
+            }
+            
+            # Equipment catalogue
+            bot_equipment_catalogue = [
+                "iron_gauntlet", "basic_device", "steel_gauntlet", "analysis_device",
+                "fortune_device", "silver_gauntlet", "gold_gauntlet", "mastery_device",
+            ]
+            
+            # ── Load or initialize bot state ─────────────────────────────
+            stats_file = f"user_{bot_name}_stats.json"
+            data_file = f"user_{bot_name}_data.json"
+            ach_file = f"user_{bot_name}_achievements.json"
+            equip_file = f"user_{bot_name}_equipment.json"
+            history_file = f"user_{bot_name}_history.json"
+            pvp_file = f"user_{bot_name}_pvp.json"
+            progression_file = f"user_{bot_name}_progression.json"
+            
+            stats = self._load_json(stats_file, {
+                "total_rolls": 0, "total_wins": 0, "best_streak": 0,
+                "current_streak": 0, "fastest_win": None, "slowest_win": 0,
+                "avg_rolls_per_win": 0, "property_discoveries": {}, "play_time": 0,
+                "start_time": time.time()
+            })
+            
+            user_data = self._load_json(data_file, {
+                "player_level": 1, "player_xp": 0, "sp": 0, "sp_plus": 0,
+                "sp_x": 0, "sp_caret": 0, "difficulty": "normal",
+                "current_specialization": None, "current_game_mode": "Classic",
+                "challenges": {}
+            })
+            
+            achievements = self._load_json(ach_file, default_achievements)
+            # Merge any missing achievements
+            for k, v in default_achievements.items():
+                if k not in achievements:
+                    achievements[k] = v
+            
+            equipment = self._load_json(equip_file, {"owned": [], "equipped": {}, "sp": 0,
+                                                      "sp_plus": 0, "sp_x": 0, "sp_caret": 0})
+            
+            history = self._load_json(history_file, [])
+            if not isinstance(history, list):
+                history = []
+            
+            pvp_data = self._load_json(pvp_file, {
+                "elo": 1000, "wins": 0, "losses": 0, "draws": 0,
+                "streak": 0, "best_streak": 0, "history": []
+            })
+            
+            progression = self._load_json(progression_file, {
+                "prestige_level": 0, "prestige_points": 0,
+                "specialization": None, "mechanic_unlocks": {}
+            })
+            
+            # Sync currency from equipment file (that's where it's stored)
+            sp = equipment.get("sp", user_data.get("sp", 0))
+            sp_plus = equipment.get("sp_plus", user_data.get("sp_plus", 0))
+            sp_x = equipment.get("sp_x", user_data.get("sp_x", 0))
+            sp_caret = equipment.get("sp_caret", user_data.get("sp_caret", 0))
+            
+            total_rolls = stats.get("total_rolls", 0)
+            total_wins = stats.get("total_wins", 0)
+            current_streak = stats.get("current_streak", 0)
+            best_streak = stats.get("best_streak", 0)
+            fastest_win = stats.get("fastest_win")
+            slowest_win = stats.get("slowest_win", 0)
+            level = user_data.get("player_level", 1)
+            xp = user_data.get("player_xp", 0)
+            xp_needed = 50 + (level - 1) * 25
+            discoveries = stats.get("property_discoveries", {})
+            pvp_elo = pvp_data.get("elo", 1000)
+            pvp_wins = pvp_data.get("wins", 0)
+            pvp_losses = pvp_data.get("losses", 0)
+            pvp_streak = pvp_data.get("streak", 0)
+            pvp_best_streak = pvp_data.get("best_streak", 0)
+            owned_items = equipment.get("owned", [])
+            equipped_items = equipment.get("equipped", {})
+            
+            round_rolls = 0  # rolls in current "round"
+            
+            # Generate initial target
+            num_target_props = min(2 + total_wins // 15, 6)
+            target = set(random.sample(possible_properties, min(num_target_props, len(possible_properties))))
+            
+            def _save_all():
+                """Persist all bot state to disk"""
+                stats["total_rolls"] = total_rolls
+                stats["total_wins"] = total_wins
+                stats["current_streak"] = current_streak
+                stats["best_streak"] = best_streak
+                stats["fastest_win"] = fastest_win
+                stats["slowest_win"] = slowest_win
+                stats["property_discoveries"] = discoveries
+                if total_wins > 0:
+                    stats["avg_rolls_per_win"] = round(total_rolls / total_wins, 1)
+                stats["play_time"] = stats.get("play_time", 0) + 2  # ~2s per save cycle
+                
+                user_data["player_level"] = level
+                user_data["player_xp"] = xp
+                user_data["sp"] = sp
+                user_data["sp_plus"] = sp_plus
+                user_data["sp_x"] = sp_x
+                user_data["sp_caret"] = sp_caret
+                user_data["current_game_mode"] = "Classic"
+                user_data["difficulty"] = "normal"
+                
+                equipment["sp"] = sp
+                equipment["sp_plus"] = sp_plus
+                equipment["sp_x"] = sp_x
+                equipment["sp_caret"] = sp_caret
+                equipment["owned"] = owned_items
+                equipment["equipped"] = equipped_items
+                
+                self._save_json(stats_file, stats)
+                self._save_json(data_file, user_data)
+                self._save_json(ach_file, achievements)
+                self._save_json(equip_file, equipment)
+                self._save_json(pvp_file, pvp_data)
+                self._save_json(progression_file, progression)
+                # Trim history to last 500
+                self._save_json(history_file, history[-500:])
+                
+                # Update last played
+                accts = self.account_manager._load_accounts()
+                if bot_name in accts:
+                    accts[bot_name]["last_played"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    accts[bot_name]["play_time"] = accts[bot_name].get("play_time", 0) + 2
+                    self.account_manager.accounts = accts
+                    self.account_manager._save_accounts()
+            
+            # ── Main bot loop ─────────────────────────────────────────────
+            roll_batch = 0  # count rolls between saves
+            
+            while not stop_event.is_set():
+                try:
+                    # === SIMULATE A ROLL ===
+                    s = self._generate_random_string()
+                    properties = self._analyze_string(s)
+                    total_rolls += 1
+                    round_rolls += 1
+                    
+                    # Track property discoveries
+                    prop_display_map = {
+                        "has_numbers": "Has Numbers", "has_symbols": "Has Symbols",
+                        "has_uppercase": "Has Uppercase", "has_lowercase": "Has Lowercase",
+                        "is_long": "Is Long", "has_spaces": "Has Spaces",
+                        "has_operators": "Has Operators", "has_multiple_words": "Has Multiple Words",
+                        "has_repeats": "Has Repeats", "starts_with_letter": "Starts With Letter",
+                        "ends_with_symbol": "Ends With Symbol", "has_punctuation": "Has Punctuation",
+                        "has_vowels": "Has Vowels", "is_very_long": "Is Very Long",
+                        "has_consecutive_letters": "Has Consecutive Letters"
+                    }
+                    for prop in properties:
+                        dn = prop_display_map.get(prop, prop)
+                        discoveries[dn] = discoveries.get(dn, 0) + 1
+                    
+                    matches = len(properties & target)
+                    won = (properties == target)
+                    
+                    # Calculate SP
+                    str_len = len(s)
+                    if str_len >= 40:
+                        sp_type, sp_display = "sp_caret", "SP^"
+                    elif str_len >= 30:
+                        sp_type, sp_display = "sp_x", "SPx"
+                    elif str_len >= 15:
+                        sp_type, sp_display = "sp_plus", "SP+"
+                    else:
+                        sp_type, sp_display = "sp", "SP"
+                    
+                    sp_earned = 0
+                    xp_earned = 0
+                    is_critical = random.random() < 0.03  # 3% crit chance
+                    
+                    # Record history entry
+                    entry = {
+                        "number": total_rolls, "string": s,
+                        "properties": list(properties), "target_properties": list(target),
+                        "matches": matches, "total_needed": len(target),
+                        "timestamp": datetime.datetime.now().isoformat(),
+                        "won": won, "sp_earned": 0, "xp_earned": 0,
+                        "is_critical": is_critical,
+                        "match_pct": round(matches / max(1, len(target)) * 100, 1)
+                    }
+                    
+                    if won:
+                        total_wins += 1
+                        current_streak += 1
+                        if current_streak > best_streak:
+                            best_streak = current_streak
+                        
+                        # Track fastest/slowest win
+                        if fastest_win is None or round_rolls < fastest_win:
+                            fastest_win = round_rolls
+                        if round_rolls > slowest_win:
+                            slowest_win = round_rolls
+                        
+                        # Award SP
+                        base_sp = {"sp": 5, "sp_plus": 10, "sp_x": 15, "sp_caret": 20}.get(sp_type, 5)
+                        # Streak multiplier
+                        streak_mult = 1.0 + min(current_streak, 10) * 0.05
+                        sp_earned = int(base_sp * streak_mult)
+                        if is_critical:
+                            sp_earned *= 3
+                        
+                        if sp_type == "sp":
+                            sp += sp_earned
+                        elif sp_type == "sp_plus":
+                            sp_plus += sp_earned
+                        elif sp_type == "sp_x":
+                            sp_x += sp_earned
+                        elif sp_type == "sp_caret":
+                            sp_caret += sp_earned
+                        
+                        # Award XP
+                        xp_earned = 10 + (sp_earned // 5)
+                        if is_critical:
+                            xp_earned *= 3
+                        xp += xp_earned
+                        
+                        # Level up check
+                        while xp >= xp_needed:
+                            xp -= xp_needed
+                            level += 1
+                            xp_needed = 50 + (level - 1) * 25
+                        
+                        entry["sp_earned"] = sp_earned
+                        entry["xp_earned"] = xp_earned
+                        
+                        # === UNLOCK ACHIEVEMENTS ===
+                        ach_checks = {
+                            "first_win": total_wins >= 1,
+                            "ten_wins": total_wins >= 10,
+                            "fifty_wins": total_wins >= 50,
+                            "hundred_wins": total_wins >= 100,
+                            "fivehundred_wins": total_wins >= 500,
+                            "hundred_rolls": total_rolls >= 100,
+                            "fivehundred_rolls": total_rolls >= 500,
+                            "thousand_rolls": total_rolls >= 1000,
+                            "perfectionist": best_streak >= 3,
+                            "streak_breaker": best_streak >= 5,
+                            "on_fire": best_streak >= 10,
+                            "speed_demon": round_rolls <= 30,
+                            "lightning": round_rolls <= 10,
+                            "sp_collector": sp >= 50,
+                            "sp_hoarder": sp >= 500,
+                            "property_master": len(discoveries) >= 10,
+                            "explorer": len(discoveries) >= 15,
+                            "first_craft": len(owned_items) >= 1,
+                            "pvp_debut": pvp_wins >= 1,
+                        }
+                        now_hour = datetime.datetime.now().hour
+                        if 0 <= now_hour < 6:
+                            ach_checks["night_owl"] = True
+                        
+                        for ach_id, condition in ach_checks.items():
+                            if ach_id in achievements and condition:
+                                if not achievements[ach_id].get("unlocked"):
+                                    achievements[ach_id]["unlocked"] = True
+                                    achievements[ach_id]["unlock_time"] = datetime.datetime.now().isoformat()
+                        
+                        # === BOT BUYS EQUIPMENT (every ~20 wins) ===
+                        if total_wins % 20 == 0 and total_wins > 0:
+                            for item_id in bot_equipment_catalogue:
+                                if item_id not in owned_items:
+                                    recipe = self.equipment_recipes.get(item_id)
+                                    if recipe:
+                                        cost = recipe.get("cost", {})
+                                        can_buy = True
+                                        if cost.get("sp", 0) > sp: can_buy = False
+                                        if cost.get("sp_plus", 0) > sp_plus: can_buy = False
+                                        if cost.get("sp_x", 0) > sp_x: can_buy = False
+                                        if cost.get("sp_caret", 0) > sp_caret: can_buy = False
+                                        if can_buy:
+                                            sp -= cost.get("sp", 0)
+                                            sp_plus -= cost.get("sp_plus", 0)
+                                            sp_x -= cost.get("sp_x", 0)
+                                            sp_caret -= cost.get("sp_caret", 0)
+                                            owned_items.append(item_id)
+                                            # Equip it
+                                            item_type = recipe.get("type", "device")
+                                            if item_type in ("gauntlet", "device"):
+                                                equipped_items[item_type] = item_id
+                                    break  # Buy one at a time
+                        
+                        # === BOT SIMULATES PVP (every ~50 wins) ===
+                        if total_wins % 50 == 0 and total_wins > 0:
+                            pvp_won = random.random() < 0.55  # 55% bot win rate
+                            if pvp_won:
+                                pvp_wins += 1
+                                pvp_elo += random.randint(15, 30)
+                                pvp_streak += 1
+                                if pvp_streak > pvp_best_streak:
+                                    pvp_best_streak = pvp_streak
+                            else:
+                                pvp_losses += 1
+                                pvp_elo = max(100, pvp_elo - random.randint(10, 25))
+                                pvp_streak = 0
+                            pvp_data["elo"] = pvp_elo
+                            pvp_data["wins"] = pvp_wins
+                            pvp_data["losses"] = pvp_losses
+                            pvp_data["streak"] = pvp_streak
+                            pvp_data["best_streak"] = pvp_best_streak
+                        
+                        # New round — pick new target
+                        num_target_props = min(2 + total_wins // 15, 6)
+                        target = set(random.sample(possible_properties, min(num_target_props, len(possible_properties))))
+                        round_rolls = 0
+                    else:
+                        # Loss — break streak sometimes (realistic)
+                        if round_rolls > 100 and random.random() < 0.01:
+                            current_streak = 0
+                    
+                    history.append(entry)
+                    if len(history) > 500:
+                        history = history[-500:]
+                    
+                    # Save periodically (every 5 rolls to show live activity)
+                    roll_batch += 1
+                    if roll_batch >= 5:
+                        roll_batch = 0
+                        _save_all()
+                    
+                    # Sleep between rolls (simulate human-like pace)
+                    delay = random.uniform(0.15, 0.6)
+                    stop_event.wait(delay)
+                    
+                except Exception as e:
+                    # Don't crash the bot on errors, just skip and continue
+                    time.sleep(1)
+            
+            # Final save when stopping
+            _save_all()
+        
+        # Start the bot thread
+        t = threading.Thread(target=_bot_loop, daemon=True, name=f"bot_{bot_name}")
+        t.start()
+        return True, f"Bot '{bot_name}' started! Use 'spectateuser {bot_name}' to watch."
+    
+    def _stop_bot_player(self, bot_name="BotPlayer"):
+        """Stop a running bot player"""
+        if not hasattr(self, '_bot_threads') or bot_name not in self._bot_threads:
+            return False, f"Bot '{bot_name}' is not running."
+        self._bot_threads[bot_name].set()  # Signal stop
+        del self._bot_threads[bot_name]
+        return True, f"Bot '{bot_name}' stopped."
         """Calculate SP type and display name based on string length"""
         if string_length >= 40:
             return ("sp_caret", "SP^")
