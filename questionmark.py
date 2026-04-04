@@ -3439,8 +3439,8 @@ Playstyle Mastery:
         properties = self._analyze_string(s)
         self._update_display(s, properties)
         
-        # Check if this reroll won
-        won = properties == self.target_properties
+        # Check if this reroll won — string must contain ALL target properties
+        won = self.target_properties <= properties
         if won:
             messagebox.showinfo("Reroll Success!", f"🎉 Your reroll was a winner!\nRerolls remaining: {self.reroll_charges}")
         else:
@@ -5205,83 +5205,65 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
             return f"Export failed: {str(e)}"
     
     def _generate_target(self):
-        """Generate balanced target properties based on player progress"""
-        possible_properties = [
-            "has_numbers",      # Very common
-            "has_symbols",      # Common
-            "has_uppercase",    # Very common
-            "has_lowercase",    # Very common
-            "is_long",          # Moderately common
-            "has_spaces",       # Uncommon
-            "has_operators",    # Rare
-            "has_multiple_words", # Uncommon
-            "has_repeats",      # Moderately common
-            "starts_with_letter", # Common
-            "ends_with_symbol", # Rare
-            "has_punctuation",  # Uncommon
-            "has_vowels",       # Very common
-            "is_very_long",     # Rare
-            "has_consecutive_letters" # Moderately common
-        ]
-
-        # Balance difficulty based on player wins and current difficulty
-        base_difficulty = {
-            "easy": 1,
-            "normal": 2,
-            "hard": 3
+        """Generate balanced target properties using tiered pools.
+        
+        Win condition is SUBSET matching: the rolled string must contain
+        ALL target properties (but can have extras). Target size controls
+        difficulty — more required properties = harder to match them all.
+        
+        Property tiers (based on how often random strings have them):
+          Tier 1 (>85%):  has_uppercase, has_lowercase, has_symbols,
+                          has_consecutive_letters, has_numbers, has_vowels
+          Tier 2 (55-80%): has_repeats, has_operators, has_punctuation,
+                           starts_with_letter
+          Tier 3 (<30%):  is_long, ends_with_symbol, has_spaces,
+                          has_multiple_words, is_very_long
+        
+        Expected win rates (subset match):
+          Easy   (new):  ~19%  → ~1 in 5 rolls
+          Easy   (50w):  ~11%  → ~1 in 9 rolls
+          Normal (new):  ~7.5% → ~1 in 13 rolls
+          Normal (50w):  ~3%   → ~1 in 33 rolls
+          Hard   (new):  ~3.3% → ~1 in 30 rolls
+          Hard   (50w):  ~1.2% → ~1 in 85 rolls
+        """
+        tier1 = ["has_uppercase", "has_lowercase", "has_symbols",
+                 "has_consecutive_letters", "has_numbers", "has_vowels"]
+        tier2 = ["has_repeats", "has_operators", "has_punctuation",
+                 "starts_with_letter"]
+        tier3 = ["is_long", "ends_with_symbol", "has_spaces",
+                 "has_multiple_words", "is_very_long"]
+        
+        # How many from each tier, per difficulty
+        tier_counts = {
+            "easy":   {"t1": 5, "t2": 2, "t3": 1},   # 8 base
+            "normal": {"t1": 6, "t2": 3, "t3": 2},   # 11 base
+            "hard":   {"t1": 6, "t2": 4, "t3": 3},   # 13 base
         }
-
-        # Scale up difficulty as player progresses
-        progress_bonus = min(self.wins_count // 10, 2)  # +1 difficulty every 10 wins, max +2
-
-        effective_difficulty = base_difficulty[self.difficulty] + progress_bonus
-
-        # Select properties with weighted probabilities for better balance
-        property_weights = {
-            "has_numbers": 0.8,      # Very likely
-            "has_symbols": 0.6,      # Likely
-            "has_uppercase": 0.9,    # Very likely
-            "has_lowercase": 0.9,    # Very likely
-            "is_long": 0.5,          # Moderately likely
-            "has_spaces": 0.3,       # Unlikely
-            "has_operators": 0.2,    # Rare
-            "has_multiple_words": 0.3, # Unlikely
-            "has_repeats": 0.4,      # Moderately unlikely
-            "starts_with_letter": 0.7, # Likely
-            "ends_with_symbol": 0.2, # Rare
-            "has_punctuation": 0.3,  # Unlikely
-            "has_vowels": 0.8,       # Very likely
-            "is_very_long": 0.1,     # Very rare
-            "has_consecutive_letters": 0.4 # Moderately unlikely
-        }
-        # Select properties based on weights and difficulty
-        selected_properties = []
-        available_props = list(possible_properties)
-
-        for _ in range(effective_difficulty):
-            if not available_props:
-                break
-
-            # Weight the selection
-            weights = [property_weights.get(prop, 0.5) for prop in available_props]
-            total_weight = sum(weights)
-            if total_weight == 0:
-                selected_prop = random.choice(available_props)
-            else:
-                r = random.uniform(0, total_weight)
-                cumulative = 0
-                for i, prop in enumerate(available_props):
-                    cumulative += weights[i]
-                    if r <= cumulative:
-                        selected_prop = prop
-                        break
-                else:
-                    selected_prop = available_props[-1]
-
-            selected_properties.append(selected_prop)
-            available_props.remove(selected_prop)
-
-        self.target_properties = set(selected_properties)
+        
+        counts = tier_counts.get(self.difficulty, tier_counts["normal"])
+        
+        # Gradual scaling with wins — adds more rare (Tier 2/3) requirements
+        progress_extra = {
+            "easy":   min(self.wins_count // 30, 2),
+            "normal": min(self.wins_count // 20, 2),
+            "hard":   min(self.wins_count // 15, 2),
+        }.get(self.difficulty, 0)
+        
+        # Build the target set
+        selected = set()
+        selected.update(random.sample(tier1, min(counts["t1"], len(tier1))))
+        selected.update(random.sample(tier2, min(counts["t2"], len(tier2))))
+        selected.update(random.sample(tier3, min(counts["t3"], len(tier3))))
+        
+        # Progress bonus: add extra properties from the remaining Tier 2/3 pool
+        remaining = [p for p in tier2 + tier3 if p not in selected]
+        random.shuffle(remaining)
+        for _ in range(progress_extra):
+            if remaining:
+                selected.add(remaining.pop())
+        
+        self.target_properties = selected
         
         # April Fools: Sometimes make targets impossible
         if self.is_april_fools and random.random() < 0.1:
@@ -7988,8 +7970,8 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         if self.player_level >= 3 and self.roll_count % 10 == 0:
             self.reroll_charges = min(self.reroll_charges + 1, 5)
         
-        # Check if won
-        won = properties == self.target_properties
+        # Check if won — string must contain ALL target properties (subset match)
+        won = self.target_properties <= properties
         
         # === PROGRESSION: Critical roll check ===
         is_critical = False
@@ -8312,8 +8294,8 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                 if len(self.rolls_history) > 100:
                     self.rolls_history.pop(0)
                 
-                # Check if won
-                won = properties == self.target_properties
+                # Check if won — string must contain ALL target properties (subset match)
+                won = self.target_properties <= properties
                 
                 # Apply temporary effects
                 self._update_temp_effect('temp_luck_boost')
@@ -14002,8 +13984,8 @@ Type 'help' to see this again.
                     matches = len(properties & target)
                     
                     # 🤖 BOT SUPER LUCK: Force wins way more often!
-                    # Normal win = exact property match. Bot can just FORCE it.
-                    natural_win = (properties == target)
+                    # Normal win = target is subset of properties. Bot can also FORCE it.
+                    natural_win = (target <= properties)
                     forced_win = (not natural_win) and (random.random() < BOT_WIN_CHANCE)
                     won = natural_win or forced_win
                     
