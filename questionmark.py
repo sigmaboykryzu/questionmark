@@ -3793,16 +3793,20 @@ Playstyle Mastery:
         notebook = ttk.Notebook(progression_win, style="Modern.TNotebook")
         notebook.pack(fill="both", expand=True, padx=10, pady=10)
         
+        def _scrollable_tab(tab_text, create_fn):
+            """Helper to add a notebook tab with scrollable content"""
+            container = tk.Frame(notebook, bg=ui["bg_primary"])
+            notebook.add(container, text=tab_text)
+            so, si = self._styled_scrollable(container, bg=ui["bg_primary"])
+            so.pack(fill=tk.BOTH, expand=True)
+            create_fn(si)
+        
         # Overview tab
-        overview_frame = tk.Frame(notebook, bg=ui["bg_primary"])
-        notebook.add(overview_frame, text="Overview")
-        self._create_overview_tab(overview_frame)
+        _scrollable_tab("Overview", self._create_overview_tab)
         
         # Quests tab
         if self.mechanic_unlocks["quest_system"]["unlocked"]:
-            quests_frame = tk.Frame(notebook, bg=ui["bg_primary"])
-            notebook.add(quests_frame, text="Quests")
-            self._create_quests_tab(quests_frame)
+            _scrollable_tab("Quests", self._create_quests_tab)
         
         # Achievements tab
         achievements_frame = tk.Frame(notebook, bg=ui["bg_primary"])
@@ -3811,33 +3815,23 @@ Playstyle Mastery:
         
         # Specializations tab
         if self.mechanic_unlocks["equipment_basics"]["unlocked"]:
-            specs_frame = tk.Frame(notebook, bg=ui["bg_primary"])
-            notebook.add(specs_frame, text="Specializations")
-            self._create_specializations_tab(specs_frame)
+            _scrollable_tab("Specializations", self._create_specializations_tab)
         
         # Equipment tab
         if self.mechanic_unlocks["equipment_basics"]["unlocked"]:
-            equip_frame = tk.Frame(notebook, bg=ui["bg_primary"])
-            notebook.add(equip_frame, text="Equipment")
-            self._create_equipment_tab(equip_frame)
+            _scrollable_tab("Equipment", self._create_equipment_tab)
         
         # RNG Influence tab
         if self.mechanic_unlocks["rng_influence"]["unlocked"]:
-            rng_frame = tk.Frame(notebook, bg=ui["bg_primary"])
-            notebook.add(rng_frame, text="RNG Control")
-            self._create_rng_tab(rng_frame)
+            _scrollable_tab("RNG Control", self._create_rng_tab)
         
         # Investments tab
         if self.mechanic_unlocks["investment_system"]["unlocked"]:
-            invest_frame = tk.Frame(notebook, bg=ui["bg_primary"])
-            notebook.add(invest_frame, text="Investments")
-            self._create_investments_tab(invest_frame)
+            _scrollable_tab("Investments", self._create_investments_tab)
         
         # Prestige tab
         if self.mechanic_unlocks["prestige_system"]["unlocked"]:
-            prestige_frame = tk.Frame(notebook, bg=ui["bg_primary"])
-            notebook.add(prestige_frame, text="Prestige")
-            self._create_prestige_tab(prestige_frame)
+            _scrollable_tab("Prestige", self._create_prestige_tab)
     
     def _create_overview_tab(self, parent):
         """Create overview tab with key stats and progress"""
@@ -4000,6 +3994,13 @@ Properties Discovered: {len(self.stats.get('property_discoveries', {}))}
         
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        
+        def _mw(event):
+            try: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError: pass
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw))
+        canvas.bind("<Leave>", lambda e: (canvas.unbind_all("<MouseWheel>") if canvas.winfo_exists() else None))
+        scrollable_frame.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw))
         
         row = 0
         for key, achievement in self.progression_achievements.items():
@@ -4405,6 +4406,13 @@ Properties Discovered: {len(self.stats.get('property_discoveries', {}))}
         
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        
+        def _mw_ms(event):
+            try: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError: pass
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw_ms))
+        canvas.bind("<Leave>", lambda e: (canvas.unbind_all("<MouseWheel>") if canvas.winfo_exists() else None))
+        scrollable_frame.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw_ms))
         
         row = 0
         for key, milestone in self.milestone_unlocks.items():
@@ -5276,6 +5284,13 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
+        def _mw_login(event):
+            try: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError: pass
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw_login))
+        canvas.bind("<Leave>", lambda e: (canvas.unbind_all("<MouseWheel>") if canvas.winfo_exists() else None))
+        scrollable_frame.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw_login))
+        
         # Title
         title_label = tk.Label(scrollable_frame, text="🎮 QUESTIONMARK", font=("Segoe UI", 22, "bold"),
                               bg="#0f0f1a", fg="#b388ff", pady=15)
@@ -5413,6 +5428,13 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        
+        def _mw_login2(event):
+            try: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError: pass
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw_login2))
+        canvas.bind("<Leave>", lambda e: (canvas.unbind_all("<MouseWheel>") if canvas.winfo_exists() else None))
+        scrollable_frame.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw_login2))
         
         # Remembered accounts section (if any exist)
         remembered = self.account_manager.get_remembered_accounts()
@@ -5757,14 +5779,32 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Mousewheel
+        # Mousewheel — bind only while cursor is inside this canvas
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+            try:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError:
+                pass
+        
+        def _on_enter(event):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        def _on_leave(event):
+            try:
+                canvas.unbind_all("<MouseWheel>")
+            except Exception:
+                pass
+        
+        canvas.bind("<Enter>", _on_enter)
+        canvas.bind("<Leave>", _on_leave)
+        # Also bind on the inner frame so children don't steal focus
+        inner.bind("<Enter>", _on_enter)
         
         def _cleanup(event=None):
-            try: canvas.unbind_all("<MouseWheel>")
-            except: pass
+            try:
+                canvas.unbind_all("<MouseWheel>")
+            except Exception:
+                pass
         
         parent.winfo_toplevel().bind("<Destroy>", _cleanup, add="+")
         
@@ -6966,8 +7006,11 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         challenges_scroll.config(state=tk.DISABLED)
 
         # ── Settings Tab ──
-        settings_frame = tk.Frame(notebook, bg=ui["bg_primary"])
-        notebook.add(settings_frame, text="  🎮 Game Settings  ")
+        settings_tab_container = tk.Frame(notebook, bg=ui["bg_primary"])
+        notebook.add(settings_tab_container, text="  🎮 Game Settings  ")
+
+        settings_scroll_outer, settings_frame = self._styled_scrollable(settings_tab_container, ui["bg_primary"])
+        settings_scroll_outer.pack(fill=tk.BOTH, expand=True)
 
         # Sound settings
         sound_frame = tk.LabelFrame(settings_frame, text="🔊 Audio", bg=ui["bg_card"], fg=ui["accent_light"],
@@ -7374,8 +7417,9 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         
         self._styled_header(stats_win, "Statistics", subtitle="Your gameplay overview", icon="📊")
         
-        content = tk.Frame(stats_win, bg=ui["bg_primary"])
-        content.pack(fill=tk.BOTH, expand=True, padx=15, pady=(5, 15))
+        # Scrollable content wrapper
+        scroll_outer, content = self._styled_scrollable(stats_win, ui["bg_primary"])
+        scroll_outer.pack(fill=tk.BOTH, expand=True, padx=15, pady=(5, 15))
         
         # Basic stats card
         basic_outer, basic_inner = self._styled_card(content, title="Game Statistics")
@@ -8459,20 +8503,15 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Mousewheel scroll
+        # Mousewheel scroll — bind only when cursor is over this canvas
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
-        
-        def _unbind_wheel(event=None):
             try:
-                canvas.unbind_all("<MouseWheel>")
-            except Exception:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError:
                 pass
-        
-        # Ensure we unbind on window close
-        parent_win = parent.winfo_toplevel()
-        parent_win.protocol("WM_DELETE_WINDOW", lambda: (_unbind_wheel(), parent_win.destroy()))
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda e: (canvas.unbind_all("<MouseWheel>") if canvas.winfo_exists() else None))
+        scroll_frame.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
         
         def _refresh():
             for w in scroll_frame.winfo_children():
@@ -8627,6 +8666,13 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
+        def _mw(event):
+            try: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError: pass
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw))
+        canvas.bind("<Leave>", lambda e: (canvas.unbind_all("<MouseWheel>") if canvas.winfo_exists() else None))
+        scroll_frame.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw))
+        
         hist = self.rolls_history
         if not hist:
             tk.Label(scroll_frame, text="No data yet.", font=("Segoe UI", 14),
@@ -8760,6 +8806,13 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        def _mw(event):
+            try: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError: pass
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw))
+        canvas.bind("<Leave>", lambda e: (canvas.unbind_all("<MouseWheel>") if canvas.winfo_exists() else None))
+        scroll_frame.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _mw))
         
         hist = self.rolls_history
         if not hist:
@@ -10093,8 +10146,11 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         ov_tab = tk.Frame(notebook, bg=ui["bg_primary"])
         notebook.add(ov_tab, text="  🏠 Overview  ")
 
+        ov_scroll_outer, ov_inner = self._styled_scrollable(ov_tab, bg=ui["bg_primary"])
+        ov_scroll_outer.pack(fill=tk.BOTH, expand=True)
+
         # ── Hero banner
-        hero = tk.Frame(ov_tab, bg=ui["bg_card"], padx=20, pady=14)
+        hero = tk.Frame(ov_inner, bg=ui["bg_card"], padx=20, pady=14)
         hero.pack(fill=tk.X, padx=12, pady=(12, 6))
 
         title = self._get_player_title_for_wins(self.wins_count)
@@ -10117,7 +10173,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         xp_fill.place(x=0, y=0, relwidth=max(0.01, xp_ratio))
 
         # ── Key stats grid (2 columns)
-        grid = tk.Frame(ov_tab, bg=ui["bg_primary"])
+        grid = tk.Frame(ov_inner, bg=ui["bg_primary"])
         grid.pack(fill=tk.X, padx=12, pady=6)
         grid.columnconfigure(0, weight=1)
         grid.columnconfigure(1, weight=1)
@@ -10139,7 +10195,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         _stat_card(grid, "⚔️", "PvP ELO",           pvp_elo, ui["accent_light"], 2, 1)
 
         # ── Active Effects
-        effects_card = tk.Frame(ov_tab, bg=ui["bg_card"], padx=14, pady=8)
+        effects_card = tk.Frame(ov_inner, bg=ui["bg_card"], padx=14, pady=8)
         effects_card.pack(fill=tk.X, padx=12, pady=(4, 6))
         tk.Label(effects_card, text="✨ Active Effects", font=ui["font_small_bold"],
                  bg=ui["bg_card"], fg=ui["accent_light"]).pack(anchor="w")
@@ -12382,6 +12438,13 @@ DISCOVERY STATS:
         cmd_scrollable_frame.bind("<Configure>", lambda e: cmd_canvas.configure(scrollregion=cmd_canvas.bbox("all")))
         cmd_canvas.create_window((0, 0), window=cmd_scrollable_frame, anchor="nw")
         cmd_canvas.configure(yscrollcommand=cmd_scrollbar.set)
+        
+        def _mw_cmd(event):
+            try: cmd_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError: pass
+        cmd_canvas.bind("<Enter>", lambda e: cmd_canvas.bind_all("<MouseWheel>", _mw_cmd))
+        cmd_canvas.bind("<Leave>", lambda e: (cmd_canvas.unbind_all("<MouseWheel>") if cmd_canvas.winfo_exists() else None))
+        cmd_scrollable_frame.bind("<Enter>", lambda e: cmd_canvas.bind_all("<MouseWheel>", _mw_cmd))
         
         commands_list = [
             ("help", "Display all available commands"),
