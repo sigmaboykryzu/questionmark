@@ -638,10 +638,16 @@ class RollingGame:
             config["font"] = font
         label.config(**config)
     
-    def _update_temp_effect(self, attr_name, timer_name='temp_effects_timer'):
-        """Helper to decrement and clear temporary effects"""
+    def _update_temp_effect(self, attr_name, timer_name=None):
+        """Helper to decrement and clear temporary effects.
+        Uses a per-attribute timer (attr_name + '_timer') to avoid shared timer bugs."""
+        if timer_name is None:
+            timer_name = attr_name + '_timer'
+        if not hasattr(self, timer_name):
+            setattr(self, timer_name, 0)
         if hasattr(self, attr_name) and getattr(self, attr_name) > 0:
-            setattr(self, timer_name, getattr(self, timer_name) - 1)
+            current = getattr(self, timer_name, 0)
+            setattr(self, timer_name, current - 1)
             if getattr(self, timer_name) <= 0:
                 setattr(self, attr_name, 0)
     
@@ -5993,7 +5999,10 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
 
         # ── Group 3: Activities ──
         _nav_btn(nav_inner, "🏟️", "PvP",          self.show_pvp_arena,           ui["danger"])
-        _nav_btn(nav_inner, "⚔️", "Tourney",      self.show_tournament_window,   ui["warning"])
+        # Only show tournament button if player is whitelisted (or whitelist is empty/disabled)
+        tourney_allowed, _ = self._is_tournament_allowed()
+        if tourney_allowed:
+            _nav_btn(nav_inner, "⚔️", "Tourney",      self.show_tournament_window,   ui["warning"])
         _nav_btn(nav_inner, "🎲", "Modes",        self.show_game_mode_window,    ui["info"])
         _nav_btn(nav_inner, "🕹️", "Mini",         self.play_mini_game,           ui["success"])
         _nav_btn(nav_inner, "📉", "Analytics",    self.show_analytics_window,    ui["text_secondary"])
@@ -6477,6 +6486,17 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         
         flash(0)
     
+    def _play_achievement_sound(self):
+        """Play achievement unlock sound effect"""
+        try:
+            self._play_sound_effect("achievement")
+        except Exception:
+            pass
+    
+    def _flash_screen(self):
+        """Flash the screen for milestone celebrations (alias for _celebration_animation)"""
+        self._celebration_animation()
+    
     def _play_sound_effect(self, effect_name):
         """Play a sound effect by name"""
         if not self.sound_enabled:
@@ -6521,17 +6541,17 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
             'Down': 'down',
             'Left': 'left',
             'Right': 'right',
-            'b': 'ba',
-            'a': 'ba'
+            'b': 'b',
+            'a': 'a'
         }
         
         key = key_map.get(event.keysym, event.char.lower() if event.char else '')
         if key:
             self.konami_code_buffer.append(key)
-            if len(self.konami_code_buffer) > 10:
+            if len(self.konami_code_buffer) > 12:
                 self.konami_code_buffer.pop(0)
             
-            konami_sequence = ['up', 'up', 'down', 'down', 'left', 'right', 'left', 'right', 'ba']
+            konami_sequence = ['up', 'up', 'down', 'down', 'left', 'right', 'left', 'right', 'b', 'a']
             if self.konami_code_buffer == konami_sequence:
                 self._activate_konami_mode()
                 self.konami_code_buffer = []
@@ -8324,10 +8344,6 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                     mode_bonus = self.apply_mode_bonuses(sp_gained)
                     sp_gained = mode_bonus
                     
-                    # Define xp_earned and streak_mult
-                    xp_earned = self.calculate_xp(sp_gained)  # Example calculation
-                    streak_mult = 1 + (self.winning_streak - 1) * 0.1  # Example multiplier
-                    
                     # Apply skill bonuses and streak multiplier
                     sp_gained = self._apply_skill_bonuses(sp_gained)
                     streak_mult = self._get_streak_multiplier()
@@ -8377,18 +8393,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                     streak_text = f" | Streak: {self.winning_streak}" if self.winning_streak > 1 else ""
                     level_text = f" | Level {self.player_level}"
             
-                    messagebox.showinfo("Victory!", f"Won sequence!\n+{sp_gained} {sp_display}{bonus_text}\n+{xp_earned} XP\n\nTotal: {self.sp}|{self.sp_plus}|{self.sp_x}|{self.sp_caret}\n\nRank: {player_title}{streak_text}{level_text}{reward_text}")
-            
-                    # Show streak bonus message with animation (non-blocking)
-                    if self.winning_streak >= 3:
-                        streak_msg = f"🔥 {self.winning_streak}-WIN STREAK! (×{streak_mult:.1f} SP!)"
-                        try:
-                            self.root.after(500, lambda msg=streak_msg: messagebox.showinfo("🎉 COMBO BONUS!", msg))
-                            # Flash screen on big streaks
-                            if self.winning_streak % 5 == 0 and self.animations_enabled:
-                                self._flash_screen()
-                        except:
-                            pass
+                    # Update match label with auto-roll win info (non-blocking, thread-safe)
+                    win_msg = f"✅ +{sp_gained} {sp_display} | +{xp_earned} XP{streak_text}"
+                    self.root.after(0, lambda m=win_msg: self.match_label.config(
+                        text=m, fg=self._ui["success"], font=("Segoe UI", 11, "bold")))
                 
                 # Yield to UI thread every few rolls to prevent freezing
                 if (roll_idx + 1) % 5 == 0:
@@ -12786,6 +12794,12 @@ Type 'help' to see this again.
                             if "owned" not in self.equipment_inventory:
                                 self.equipment_inventory["owned"] = []
                             self.equipment_inventory["owned"].append(item_id)
+                            # Also mark as purchased so shop shows 'Use' not 'Buy'
+                            if "shop_purchases" not in self.equipment_inventory:
+                                self.equipment_inventory["shop_purchases"] = []
+                            if item_id not in self.equipment_inventory["shop_purchases"]:
+                                self.equipment_inventory["shop_purchases"].append(item_id)
+                            self._save_equipment()
                             console_text.insert(tk.END, f"\n[OK] Item '{item_id}' added to inventory")
                         else:
                             console_text.insert(tk.END, f"\n[ERROR] Item '{item_id}' not found")
@@ -14204,6 +14218,8 @@ Type 'help' to see this again.
         self._bot_threads[bot_name].set()  # Signal stop
         del self._bot_threads[bot_name]
         return True, f"Bot '{bot_name}' stopped."
+
+    def _calculate_sp(self, string_length):
         """Calculate SP type and display name based on string length"""
         if string_length >= 40:
             return ("sp_caret", "SP^")
