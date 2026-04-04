@@ -13397,8 +13397,11 @@ Type 'help' to see this again.
                 anything_happened = True
                 recipe = self.equipment_recipes.get(item_id, {})
                 item_name = recipe.get("desc", item_id)
+                # Check if it's a bot-exclusive item (not in normal recipes)
+                is_bot_item = not recipe
+                tag = "🤖🛡️ BOT-EXCLUSIVE ITEM" if is_bot_item else "🛡️ BOUGHT ITEM"
                 _log_separator()
-                _log(f"🛡️ BOUGHT ITEM: {item_name} ({item_id})", "equipment")
+                _log(f"{tag}: {item_name} ({item_id})", "equipment")
                 _log_separator()
             
             # ── Detect new achievements ───────────────────────────────
@@ -13482,8 +13485,8 @@ Type 'help' to see this again.
         _tick()
     
     def _start_bot_player(self, bot_name="BotPlayer"):
-        """Start a bot that simulates a real player — rolls, wins, earns SP, crafts, etc.
-        Runs in a background thread, saving to user files so spectateuser can watch it live."""
+        """Start a SUPERCHARGED bot that plays insanely fast with boosted luck, massive SP,
+        and access to an exclusive bot-only mega shop. Runs in background thread."""
         import threading
         
         # Prevent duplicate bots
@@ -13500,7 +13503,7 @@ Type 'help' to see this again.
                 "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "last_played": None,
                 "play_time": 0,
-                "title": "Bot"
+                "title": "🤖 Bot"
             }
             self.account_manager.accounts = accounts
             self.account_manager._save_accounts()
@@ -13510,7 +13513,7 @@ Type 'help' to see this again.
         self._bot_threads[bot_name] = stop_event
         
         def _bot_loop():
-            """Background bot simulation loop"""
+            """Background bot simulation loop — SUPERCHARGED"""
             possible_properties = [
                 "has_numbers", "has_symbols", "has_uppercase", "has_lowercase", "is_long",
                 "has_spaces", "has_operators", "has_multiple_words", "has_repeats",
@@ -13544,11 +13547,139 @@ Type 'help' to see this again.
                 "night_owl":       {"unlocked": False, "name": "Night Owl",         "desc": "Play between 12 AM and 6 AM",        "rarity": "rare",      "category": "special",    "reward": 20,   "goal": 1},
             }
             
-            # Equipment catalogue
-            bot_equipment_catalogue = [
-                "iron_gauntlet", "basic_device", "steel_gauntlet", "analysis_device",
-                "fortune_device", "silver_gauntlet", "gold_gauntlet", "mastery_device",
-            ]
+            # ═══════════════════════════════════════════════════════════
+            # 🤖 MASSIVE BOT-EXCLUSIVE ITEM CATALOGUE
+            # Normal players CANNOT access these — bot_exclusive = True
+            # ═══════════════════════════════════════════════════════════
+            bot_exclusive_items = {
+                # ── QUANTUM GAUNTLETS ─────────────────────────────────
+                "quantum_gauntlet_mk1":    {"type": "gauntlet", "cost": {"sp": 20},       "effect": "quantum_luck_10",     "desc": "🔮 Quantum Gauntlet Mk.I — +10% luck",          "bot_exclusive": True},
+                "quantum_gauntlet_mk2":    {"type": "gauntlet", "cost": {"sp": 50},       "effect": "quantum_luck_20",     "desc": "🔮 Quantum Gauntlet Mk.II — +20% luck",         "bot_exclusive": True},
+                "quantum_gauntlet_mk3":    {"type": "gauntlet", "cost": {"sp": 120},      "effect": "quantum_luck_35",     "desc": "🔮 Quantum Gauntlet Mk.III — +35% luck",        "bot_exclusive": True},
+                "quantum_gauntlet_omega":  {"type": "gauntlet", "cost": {"sp": 300},      "effect": "quantum_luck_50",     "desc": "🔮 Quantum Gauntlet Ω — +50% luck",             "bot_exclusive": True},
+                # ── NEURAL DEVICES ────────────────────────────────────
+                "neural_scanner_v1":       {"type": "device",   "cost": {"sp": 25},       "effect": "neural_scan_1",       "desc": "🧠 Neural Scanner v1 — Scan 1 property",        "bot_exclusive": True},
+                "neural_scanner_v2":       {"type": "device",   "cost": {"sp": 60},       "effect": "neural_scan_2",       "desc": "🧠 Neural Scanner v2 — Scan 2 properties",      "bot_exclusive": True},
+                "neural_scanner_v3":       {"type": "device",   "cost": {"sp": 150},      "effect": "neural_scan_all",     "desc": "🧠 Neural Scanner v3 — Full brain scan",        "bot_exclusive": True},
+                "neural_overdrive":        {"type": "device",   "cost": {"sp": 400},      "effect": "neural_max",          "desc": "🧠 Neural Overdrive — 200% brain power",        "bot_exclusive": True},
+                # ── TITANIUM ARMOR SET ────────────────────────────────
+                "titanium_helmet":         {"type": "helmet",   "cost": {"sp": 30},       "effect": "armor_head_5",        "desc": "🪖 Titanium Helmet — +5 defense",               "bot_exclusive": True},
+                "titanium_chestplate":     {"type": "chest",    "cost": {"sp": 45},       "effect": "armor_chest_8",       "desc": "🛡️ Titanium Chestplate — +8 defense",           "bot_exclusive": True},
+                "titanium_leggings":       {"type": "legs",     "cost": {"sp": 35},       "effect": "armor_legs_6",        "desc": "🦿 Titanium Leggings — +6 defense",             "bot_exclusive": True},
+                "titanium_boots":          {"type": "boots",    "cost": {"sp": 25},       "effect": "armor_feet_4",        "desc": "👢 Titanium Boots — +4 speed",                  "bot_exclusive": True},
+                # ── NEON ARMOR SET ────────────────────────────────────
+                "neon_helmet":             {"type": "helmet",   "cost": {"sp": 80},       "effect": "neon_head_10",        "desc": "💡 Neon Helmet — +10 glow defense",             "bot_exclusive": True},
+                "neon_chestplate":         {"type": "chest",    "cost": {"sp": 120},      "effect": "neon_chest_15",       "desc": "💡 Neon Chestplate — +15 glow defense",         "bot_exclusive": True},
+                "neon_leggings":           {"type": "legs",     "cost": {"sp": 100},      "effect": "neon_legs_12",        "desc": "💡 Neon Leggings — +12 glow defense",           "bot_exclusive": True},
+                "neon_boots":              {"type": "boots",    "cost": {"sp": 70},       "effect": "neon_feet_8",         "desc": "💡 Neon Boots — +8 glow speed",                 "bot_exclusive": True},
+                # ── VOID ARMOR SET ────────────────────────────────────
+                "void_helmet":             {"type": "helmet",   "cost": {"sp": 200},      "effect": "void_head_20",        "desc": "🌑 Void Helmet — +20 shadow defense",           "bot_exclusive": True},
+                "void_chestplate":         {"type": "chest",    "cost": {"sp": 300},      "effect": "void_chest_30",       "desc": "🌑 Void Chestplate — +30 shadow defense",       "bot_exclusive": True},
+                "void_leggings":           {"type": "legs",     "cost": {"sp": 250},      "effect": "void_legs_25",        "desc": "🌑 Void Leggings — +25 shadow defense",         "bot_exclusive": True},
+                "void_boots":              {"type": "boots",    "cost": {"sp": 180},      "effect": "void_feet_18",        "desc": "🌑 Void Boots — +18 shadow speed",              "bot_exclusive": True},
+                # ── COSMIC WEAPONS ────────────────────────────────────
+                "plasma_sword":            {"type": "weapon",   "cost": {"sp": 40},       "effect": "dmg_plasma_12",       "desc": "⚔️ Plasma Sword — 12 energy damage",            "bot_exclusive": True},
+                "photon_blade":            {"type": "weapon",   "cost": {"sp": 90},       "effect": "dmg_photon_25",       "desc": "⚔️ Photon Blade — 25 light damage",             "bot_exclusive": True},
+                "antimatter_lance":        {"type": "weapon",   "cost": {"sp": 200},      "effect": "dmg_anti_50",         "desc": "⚔️ Antimatter Lance — 50 void damage",          "bot_exclusive": True},
+                "singularity_hammer":      {"type": "weapon",   "cost": {"sp": 350},      "effect": "dmg_gravity_75",      "desc": "🔨 Singularity Hammer — 75 gravity damage",     "bot_exclusive": True},
+                "supernova_axe":           {"type": "weapon",   "cost": {"sp": 500},      "effect": "dmg_nova_100",        "desc": "🪓 Supernova Axe — 100 stellar damage",         "bot_exclusive": True},
+                # ── SP MULTIPLIER CHIPS ───────────────────────────────
+                "sp_chip_x2":              {"type": "chip",     "cost": {"sp": 30},       "effect": "sp_mult_2x",          "desc": "💎 SP Chip ×2 — Double SP earnings",            "bot_exclusive": True},
+                "sp_chip_x3":              {"type": "chip",     "cost": {"sp": 80},       "effect": "sp_mult_3x",          "desc": "💎 SP Chip ×3 — Triple SP earnings",            "bot_exclusive": True},
+                "sp_chip_x5":              {"type": "chip",     "cost": {"sp": 200},      "effect": "sp_mult_5x",          "desc": "💎 SP Chip ×5 — Quintuple SP earnings",         "bot_exclusive": True},
+                "sp_chip_x10":             {"type": "chip",     "cost": {"sp": 500},      "effect": "sp_mult_10x",         "desc": "💎 SP Chip ×10 — MEGA SP multiplier",           "bot_exclusive": True},
+                # ── XP ACCELERATORS ───────────────────────────────────
+                "xp_injector_v1":          {"type": "implant",  "cost": {"sp": 25},       "effect": "xp_boost_50",         "desc": "💉 XP Injector v1 — +50% XP gain",              "bot_exclusive": True},
+                "xp_injector_v2":          {"type": "implant",  "cost": {"sp": 70},       "effect": "xp_boost_100",        "desc": "💉 XP Injector v2 — +100% XP gain",             "bot_exclusive": True},
+                "xp_injector_v3":          {"type": "implant",  "cost": {"sp": 180},      "effect": "xp_boost_200",        "desc": "💉 XP Injector v3 — +200% XP gain",             "bot_exclusive": True},
+                "xp_injector_max":         {"type": "implant",  "cost": {"sp": 450},      "effect": "xp_boost_500",        "desc": "💉 XP Injector MAX — +500% XP gain",            "bot_exclusive": True},
+                # ── LUCK ENHANCERS ────────────────────────────────────
+                "lucky_clover":            {"type": "trinket",  "cost": {"sp": 15},       "effect": "luck_crit_5",         "desc": "🍀 Lucky Clover — +5% crit chance",             "bot_exclusive": True},
+                "rabbits_foot":            {"type": "trinket",  "cost": {"sp": 35},       "effect": "luck_crit_10",        "desc": "🐾 Rabbit's Foot — +10% crit chance",           "bot_exclusive": True},
+                "golden_horseshoe":        {"type": "trinket",  "cost": {"sp": 75},       "effect": "luck_crit_20",        "desc": "🧲 Golden Horseshoe — +20% crit chance",        "bot_exclusive": True},
+                "chaos_dice":              {"type": "trinket",  "cost": {"sp": 150},      "effect": "luck_crit_35",        "desc": "🎲 Chaos Dice — +35% crit chance",              "bot_exclusive": True},
+                "fate_manipulator":        {"type": "trinket",  "cost": {"sp": 300},      "effect": "luck_crit_50",        "desc": "🌀 Fate Manipulator — +50% crit chance",        "bot_exclusive": True},
+                # ── PVP GEAR ──────────────────────────────────────────
+                "pvp_badge_bronze":        {"type": "badge",    "cost": {"sp": 20},       "effect": "pvp_elo_boost_5",     "desc": "🥉 Bronze PvP Badge — +5 ELO per win",          "bot_exclusive": True},
+                "pvp_badge_silver":        {"type": "badge",    "cost": {"sp": 50},       "effect": "pvp_elo_boost_10",    "desc": "🥈 Silver PvP Badge — +10 ELO per win",         "bot_exclusive": True},
+                "pvp_badge_gold":          {"type": "badge",    "cost": {"sp": 120},      "effect": "pvp_elo_boost_20",    "desc": "🥇 Gold PvP Badge — +20 ELO per win",           "bot_exclusive": True},
+                "pvp_badge_diamond":       {"type": "badge",    "cost": {"sp": 250},      "effect": "pvp_elo_boost_35",    "desc": "💠 Diamond PvP Badge — +35 ELO per win",        "bot_exclusive": True},
+                "pvp_badge_champion":      {"type": "badge",    "cost": {"sp": 500},      "effect": "pvp_elo_boost_50",    "desc": "👑 Champion PvP Badge — +50 ELO per win",       "bot_exclusive": True},
+                # ── STREAK SHIELDS ────────────────────────────────────
+                "streak_shield_wood":      {"type": "shield",   "cost": {"sp": 20},       "effect": "streak_protect_10",   "desc": "🪵 Wood Streak Shield — 10% streak protection", "bot_exclusive": True},
+                "streak_shield_iron":      {"type": "shield",   "cost": {"sp": 50},       "effect": "streak_protect_25",   "desc": "⬛ Iron Streak Shield — 25% streak protection",  "bot_exclusive": True},
+                "streak_shield_diamond":   {"type": "shield",   "cost": {"sp": 130},      "effect": "streak_protect_50",   "desc": "💎 Diamond Streak Shield — 50% streak save",    "bot_exclusive": True},
+                "streak_shield_unbreakable":{"type": "shield",  "cost": {"sp": 300},      "effect": "streak_protect_80",   "desc": "🔒 Unbreakable Shield — 80% streak save",       "bot_exclusive": True},
+                # ── SPEED MODULES ─────────────────────────────────────
+                "turbo_module_v1":         {"type": "module",   "cost": {"sp": 15},       "effect": "speed_10",            "desc": "⚡ Turbo Module v1 — 10% faster rolls",         "bot_exclusive": True},
+                "turbo_module_v2":         {"type": "module",   "cost": {"sp": 40},       "effect": "speed_25",            "desc": "⚡ Turbo Module v2 — 25% faster rolls",         "bot_exclusive": True},
+                "turbo_module_v3":         {"type": "module",   "cost": {"sp": 100},      "effect": "speed_50",            "desc": "⚡ Turbo Module v3 — 50% faster rolls",         "bot_exclusive": True},
+                "warp_drive":              {"type": "module",   "cost": {"sp": 250},      "effect": "speed_75",            "desc": "🚀 Warp Drive — 75% faster rolls",              "bot_exclusive": True},
+                "hyperdrive":              {"type": "module",   "cost": {"sp": 500},      "effect": "speed_max",           "desc": "🌌 Hyperdrive — MAXIMUM SPEED",                 "bot_exclusive": True},
+                # ── RESOURCE GENERATORS ───────────────────────────────
+                "sp_generator_basic":      {"type": "generator","cost": {"sp": 30},       "effect": "passive_sp_1",        "desc": "🔋 Basic SP Generator — +1 SP/roll",            "bot_exclusive": True},
+                "sp_generator_adv":        {"type": "generator","cost": {"sp": 80},       "effect": "passive_sp_3",        "desc": "🔋 Advanced SP Generator — +3 SP/roll",         "bot_exclusive": True},
+                "sp_generator_ultra":      {"type": "generator","cost": {"sp": 200},      "effect": "passive_sp_5",        "desc": "🔋 Ultra SP Generator — +5 SP/roll",            "bot_exclusive": True},
+                "sp_generator_quantum":    {"type": "generator","cost": {"sp": 500},      "effect": "passive_sp_10",       "desc": "🔋 Quantum SP Generator — +10 SP/roll",         "bot_exclusive": True},
+                # ── AURA EFFECTS ──────────────────────────────────────
+                "aura_fire":               {"type": "aura",     "cost": {"sp": 40},       "effect": "aura_fire",           "desc": "🔥 Fire Aura — Blazing presence",               "bot_exclusive": True},
+                "aura_ice":                {"type": "aura",     "cost": {"sp": 40},       "effect": "aura_ice",            "desc": "❄️ Ice Aura — Frozen presence",                 "bot_exclusive": True},
+                "aura_lightning":          {"type": "aura",     "cost": {"sp": 60},       "effect": "aura_lightning",      "desc": "⚡ Lightning Aura — Electrifying",              "bot_exclusive": True},
+                "aura_void":               {"type": "aura",     "cost": {"sp": 100},      "effect": "aura_void",           "desc": "🌑 Void Aura — Darkness surrounds",             "bot_exclusive": True},
+                "aura_cosmic":             {"type": "aura",     "cost": {"sp": 200},      "effect": "aura_cosmic",         "desc": "🌌 Cosmic Aura — Stars orbit you",              "bot_exclusive": True},
+                "aura_divine":             {"type": "aura",     "cost": {"sp": 400},      "effect": "aura_divine",         "desc": "👼 Divine Aura — Heavenly glow",                "bot_exclusive": True},
+                "aura_glitch":             {"type": "aura",     "cost": {"sp": 600},      "effect": "aura_glitch",         "desc": "👾 Glitch Aura — Reality bends",                "bot_exclusive": True},
+                # ── PET COMPANIONS ────────────────────────────────────
+                "pet_robot_dog":           {"type": "pet",      "cost": {"sp": 25},       "effect": "pet_luck_3",          "desc": "🐕 Robot Dog — +3% luck, good boy",             "bot_exclusive": True},
+                "pet_cyber_cat":           {"type": "pet",      "cost": {"sp": 25},       "effect": "pet_sp_2",            "desc": "🐱 Cyber Cat — +2 SP per win",                  "bot_exclusive": True},
+                "pet_plasma_parrot":       {"type": "pet",      "cost": {"sp": 50},       "effect": "pet_xp_5",            "desc": "🦜 Plasma Parrot — +5 XP per roll",             "bot_exclusive": True},
+                "pet_quantum_fox":         {"type": "pet",      "cost": {"sp": 80},       "effect": "pet_crit_5",          "desc": "🦊 Quantum Fox — +5% crit chance",              "bot_exclusive": True},
+                "pet_void_serpent":        {"type": "pet",      "cost": {"sp": 150},      "effect": "pet_all_5",           "desc": "🐍 Void Serpent — +5% everything",              "bot_exclusive": True},
+                "pet_phoenix":             {"type": "pet",      "cost": {"sp": 300},      "effect": "pet_rebirth",         "desc": "🔥 Phoenix — Resurrects streaks",               "bot_exclusive": True},
+                "pet_galaxy_dragon":       {"type": "pet",      "cost": {"sp": 600},      "effect": "pet_ultimate",        "desc": "🐉 Galaxy Dragon — ULTIMATE companion",         "bot_exclusive": True},
+                # ── TITLE CARDS ───────────────────────────────────────
+                "title_the_machine":       {"type": "title",    "cost": {"sp": 50},       "effect": "title",               "desc": "📛 Title: The Machine",                         "bot_exclusive": True},
+                "title_algorithm":         {"type": "title",    "cost": {"sp": 50},       "effect": "title",               "desc": "📛 Title: The Algorithm",                        "bot_exclusive": True},
+                "title_binary_beast":      {"type": "title",    "cost": {"sp": 100},      "effect": "title",               "desc": "📛 Title: Binary Beast",                         "bot_exclusive": True},
+                "title_digital_overlord":  {"type": "title",    "cost": {"sp": 200},      "effect": "title",               "desc": "📛 Title: Digital Overlord",                     "bot_exclusive": True},
+                "title_neural_god":        {"type": "title",    "cost": {"sp": 400},      "effect": "title",               "desc": "📛 Title: Neural God",                           "bot_exclusive": True},
+                "title_singularity":       {"type": "title",    "cost": {"sp": 800},      "effect": "title",               "desc": "📛 Title: The Singularity",                      "bot_exclusive": True},
+                # ── MYSTERY BOXES ─────────────────────────────────────
+                "mystery_box_common":      {"type": "box",      "cost": {"sp": 10},       "effect": "random_common",       "desc": "📦 Common Mystery Box",                          "bot_exclusive": True},
+                "mystery_box_rare":        {"type": "box",      "cost": {"sp": 30},       "effect": "random_rare",         "desc": "📦 Rare Mystery Box",                            "bot_exclusive": True},
+                "mystery_box_epic":        {"type": "box",      "cost": {"sp": 80},       "effect": "random_epic",         "desc": "📦 Epic Mystery Box",                            "bot_exclusive": True},
+                "mystery_box_legendary":   {"type": "box",      "cost": {"sp": 200},      "effect": "random_legendary",    "desc": "📦 Legendary Mystery Box",                       "bot_exclusive": True},
+                "mystery_box_mythic":      {"type": "box",      "cost": {"sp": 500},      "effect": "random_mythic",       "desc": "📦✨ MYTHIC Mystery Box",                        "bot_exclusive": True},
+                # ── CONSUMABLE BOOSTERS ───────────────────────────────
+                "booster_luck_1h":         {"type": "booster",  "cost": {"sp": 15},       "effect": "boost_luck_1h",       "desc": "🧪 1h Luck Potion — Boosted luck",              "bot_exclusive": True},
+                "booster_sp_1h":           {"type": "booster",  "cost": {"sp": 15},       "effect": "boost_sp_1h",         "desc": "🧪 1h SP Potion — Double SP",                   "bot_exclusive": True},
+                "booster_xp_1h":           {"type": "booster",  "cost": {"sp": 15},       "effect": "boost_xp_1h",         "desc": "🧪 1h XP Potion — Double XP",                   "bot_exclusive": True},
+                "booster_mega_30m":        {"type": "booster",  "cost": {"sp": 40},       "effect": "boost_mega_30m",      "desc": "🧪 30m MEGA Potion — Everything boosted",        "bot_exclusive": True},
+                "booster_ultra_10m":       {"type": "booster",  "cost": {"sp": 100},      "effect": "boost_ultra_10m",     "desc": "🧪 10m ULTRA Potion — INSANE boosts",            "bot_exclusive": True},
+                # ── COSMETIC SKINS ────────────────────────────────────
+                "skin_chrome":             {"type": "skin",     "cost": {"sp": 30},       "effect": "skin",                "desc": "🪞 Chrome Skin",                                "bot_exclusive": True},
+                "skin_holographic":        {"type": "skin",     "cost": {"sp": 60},       "effect": "skin",                "desc": "🌈 Holographic Skin",                           "bot_exclusive": True},
+                "skin_galaxy":             {"type": "skin",     "cost": {"sp": 100},      "effect": "skin",                "desc": "🌌 Galaxy Skin",                                "bot_exclusive": True},
+                "skin_matrix":             {"type": "skin",     "cost": {"sp": 150},      "effect": "skin",                "desc": "💚 Matrix Skin",                                "bot_exclusive": True},
+                "skin_golden":             {"type": "skin",     "cost": {"sp": 250},      "effect": "skin",                "desc": "✨ Golden Skin",                                 "bot_exclusive": True},
+                "skin_diamond":            {"type": "skin",     "cost": {"sp": 400},      "effect": "skin",                "desc": "💎 Diamond Skin",                               "bot_exclusive": True},
+                "skin_glitch_reality":     {"type": "skin",     "cost": {"sp": 700},      "effect": "skin",                "desc": "👾 Glitched Reality Skin",                      "bot_exclusive": True},
+                # ── EMOTE PACKS ───────────────────────────────────────
+                "emote_pack_basic":        {"type": "emote",    "cost": {"sp": 10},       "effect": "emotes_basic",        "desc": "😀 Basic Emote Pack (5 emotes)",                "bot_exclusive": True},
+                "emote_pack_rare":         {"type": "emote",    "cost": {"sp": 30},       "effect": "emotes_rare",         "desc": "😎 Rare Emote Pack (8 emotes)",                 "bot_exclusive": True},
+                "emote_pack_epic":         {"type": "emote",    "cost": {"sp": 70},       "effect": "emotes_epic",         "desc": "🤩 Epic Emote Pack (12 emotes)",                "bot_exclusive": True},
+                "emote_pack_legendary":    {"type": "emote",    "cost": {"sp": 150},      "effect": "emotes_legendary",    "desc": "🤯 Legendary Emote Pack (20 emotes)",           "bot_exclusive": True},
+                # ── ULTIMATE ITEMS ────────────────────────────────────
+                "infinity_core":           {"type": "core",     "cost": {"sp": 1000},     "effect": "infinite_power",      "desc": "♾️ Infinity Core — Unlimited power source",     "bot_exclusive": True},
+                "time_manipulator":        {"type": "core",     "cost": {"sp": 1500},     "effect": "time_warp",           "desc": "⏰ Time Manipulator — Bend time itself",         "bot_exclusive": True},
+                "reality_engine":          {"type": "core",     "cost": {"sp": 2000},     "effect": "reality_bend",        "desc": "🌀 Reality Engine — Rewrite the rules",          "bot_exclusive": True},
+                "omega_protocol":          {"type": "core",     "cost": {"sp": 3000},     "effect": "omega",               "desc": "Ω Omega Protocol — The final upgrade",           "bot_exclusive": True},
+                "god_mode_chip":           {"type": "core",     "cost": {"sp": 5000},     "effect": "god_mode",            "desc": "🌟 GOD MODE CHIP — Transcend everything",       "bot_exclusive": True},
+            }
+            
+            # Sorted item catalogue by cost for progressive buying
+            bot_shop_order = sorted(bot_exclusive_items.keys(), 
+                                     key=lambda x: bot_exclusive_items[x]["cost"].get("sp", 0))
             
             # ── Load or initialize bot state ─────────────────────────────
             stats_file = f"user_{bot_name}_stats.json"
@@ -13626,6 +13757,20 @@ Type 'help' to see this again.
             num_target_props = min(2 + total_wins // 15, 6)
             target = set(random.sample(possible_properties, min(num_target_props, len(possible_properties))))
             
+            # ═══════════════════════════════════════════════════════════
+            # 🤖 BOT SUPERCHARGE CONSTANTS
+            # ═══════════════════════════════════════════════════════════
+            BOT_WIN_CHANCE = 0.35           # 35% chance to FORCE a win each roll (vs ~2-5% normal)
+            BOT_CRITICAL_CHANCE = 0.18      # 18% crit chance (vs 3% for normal players)
+            BOT_SP_MULTIPLIER = 8           # 8x SP earnings
+            BOT_XP_MULTIPLIER = 5           # 5x XP earnings
+            BOT_PVP_WIN_CHANCE = 0.75       # 75% PvP win rate (vs 50/50)
+            BOT_PVP_FREQUENCY = 8           # PvP every 8 wins (vs 50)
+            BOT_SHOP_FREQUENCY = 5          # Shop every 5 wins (vs 20)
+            BOT_SAVE_EVERY = 2              # Save every 2 rolls for max spectator visibility
+            BOT_ROLL_DELAY_MIN = 0.04       # Minimum delay between rolls (FAST)
+            BOT_ROLL_DELAY_MAX = 0.15       # Maximum delay between rolls (FAST)
+            
             def _save_all():
                 """Persist all bot state to disk"""
                 stats["total_rolls"] = total_rolls
@@ -13637,7 +13782,7 @@ Type 'help' to see this again.
                 stats["property_discoveries"] = discoveries
                 if total_wins > 0:
                     stats["avg_rolls_per_win"] = round(total_rolls / total_wins, 1)
-                stats["play_time"] = stats.get("play_time", 0) + 2  # ~2s per save cycle
+                stats["play_time"] = stats.get("play_time", 0) + 1
                 
                 user_data["player_level"] = level
                 user_data["player_xp"] = xp
@@ -13668,11 +13813,11 @@ Type 'help' to see this again.
                 accts = self.account_manager._load_accounts()
                 if bot_name in accts:
                     accts[bot_name]["last_played"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    accts[bot_name]["play_time"] = accts[bot_name].get("play_time", 0) + 2
+                    accts[bot_name]["play_time"] = accts[bot_name].get("play_time", 0) + 1
                     self.account_manager.accounts = accts
                     self.account_manager._save_accounts()
             
-            # ── Main bot loop ─────────────────────────────────────────────
+            # ── Main bot loop — SUPERCHARGED ──────────────────────────────
             roll_batch = 0  # count rolls between saves
             
             while not stop_event.is_set():
@@ -13699,9 +13844,19 @@ Type 'help' to see this again.
                         discoveries[dn] = discoveries.get(dn, 0) + 1
                     
                     matches = len(properties & target)
-                    won = (properties == target)
                     
-                    # Calculate SP
+                    # 🤖 BOT SUPER LUCK: Force wins way more often!
+                    # Normal win = exact property match. Bot can just FORCE it.
+                    natural_win = (properties == target)
+                    forced_win = (not natural_win) and (random.random() < BOT_WIN_CHANCE)
+                    won = natural_win or forced_win
+                    
+                    if forced_win:
+                        # Fake the match — pretend properties matched perfectly
+                        matches = len(target)
+                        properties = set(target)  # Override so history looks legit
+                    
+                    # Calculate SP type
                     str_len = len(s)
                     if str_len >= 40:
                         sp_type, sp_display = "sp_caret", "SP^"
@@ -13714,7 +13869,8 @@ Type 'help' to see this again.
                     
                     sp_earned = 0
                     xp_earned = 0
-                    is_critical = random.random() < 0.03  # 3% crit chance
+                    # 🤖 BOT SUPER CRIT: Way higher crit chance
+                    is_critical = random.random() < BOT_CRITICAL_CHANCE
                     
                     # Record history entry
                     entry = {
@@ -13739,11 +13895,10 @@ Type 'help' to see this again.
                         if round_rolls > slowest_win:
                             slowest_win = round_rolls
                         
-                        # Award SP
+                        # 🤖 BOT MEGA SP: Massively boosted earnings
                         base_sp = {"sp": 5, "sp_plus": 10, "sp_x": 15, "sp_caret": 20}.get(sp_type, 5)
-                        # Streak multiplier
                         streak_mult = 1.0 + min(current_streak, 10) * 0.05
-                        sp_earned = int(base_sp * streak_mult)
+                        sp_earned = int(base_sp * streak_mult * BOT_SP_MULTIPLIER)
                         if is_critical:
                             sp_earned *= 3
                         
@@ -13756,13 +13911,13 @@ Type 'help' to see this again.
                         elif sp_type == "sp_caret":
                             sp_caret += sp_earned
                         
-                        # Award XP
-                        xp_earned = 10 + (sp_earned // 5)
+                        # 🤖 BOT MEGA XP: Way faster leveling
+                        xp_earned = int((10 + (sp_earned // 5)) * BOT_XP_MULTIPLIER)
                         if is_critical:
                             xp_earned *= 3
                         xp += xp_earned
                         
-                        # Level up check
+                        # Level up check (bots level up FAST)
                         while xp >= xp_needed:
                             xp -= xp_needed
                             level += 1
@@ -13803,42 +13958,61 @@ Type 'help' to see this again.
                                     achievements[ach_id]["unlocked"] = True
                                     achievements[ach_id]["unlock_time"] = datetime.datetime.now().isoformat()
                         
-                        # === BOT BUYS EQUIPMENT (every ~20 wins) ===
-                        if total_wins % 20 == 0 and total_wins > 0:
-                            for item_id in bot_equipment_catalogue:
+                        # === 🤖 BOT MEGA SHOP — Buy from exclusive catalogue frequently ===
+                        if total_wins % BOT_SHOP_FREQUENCY == 0 and total_wins > 0:
+                            # Try to buy the next cheapest item we don't own
+                            bought_something = False
+                            for item_id in bot_shop_order:
                                 if item_id not in owned_items:
-                                    recipe = self.equipment_recipes.get(item_id)
-                                    if recipe:
-                                        cost = recipe.get("cost", {})
-                                        can_buy = True
-                                        if cost.get("sp", 0) > sp: can_buy = False
-                                        if cost.get("sp_plus", 0) > sp_plus: can_buy = False
-                                        if cost.get("sp_x", 0) > sp_x: can_buy = False
-                                        if cost.get("sp_caret", 0) > sp_caret: can_buy = False
-                                        if can_buy:
-                                            sp -= cost.get("sp", 0)
-                                            sp_plus -= cost.get("sp_plus", 0)
-                                            sp_x -= cost.get("sp_x", 0)
-                                            sp_caret -= cost.get("sp_caret", 0)
-                                            owned_items.append(item_id)
-                                            # Equip it
-                                            item_type = recipe.get("type", "device")
-                                            if item_type in ("gauntlet", "device"):
+                                    item_data = bot_exclusive_items[item_id]
+                                    cost = item_data["cost"].get("sp", 0)
+                                    if sp >= cost:
+                                        sp -= cost
+                                        owned_items.append(item_id)
+                                        # Equip by type
+                                        item_type = item_data["type"]
+                                        equipped_items[item_type] = item_id
+                                        bought_something = True
+                                        break
+                            
+                            # Also check normal equipment catalogue if nothing exclusive to buy
+                            if not bought_something:
+                                normal_catalogue = [
+                                    "iron_gauntlet", "basic_device", "steel_gauntlet", "analysis_device",
+                                    "fortune_device", "silver_gauntlet", "gold_gauntlet", "mastery_device",
+                                ]
+                                for item_id in normal_catalogue:
+                                    if item_id not in owned_items:
+                                        recipe = self.equipment_recipes.get(item_id)
+                                        if recipe:
+                                            cost = recipe.get("cost", {})
+                                            can_buy = True
+                                            if cost.get("sp", 0) > sp: can_buy = False
+                                            if cost.get("sp_plus", 0) > sp_plus: can_buy = False
+                                            if cost.get("sp_x", 0) > sp_x: can_buy = False
+                                            if cost.get("sp_caret", 0) > sp_caret: can_buy = False
+                                            if can_buy:
+                                                sp -= cost.get("sp", 0)
+                                                sp_plus -= cost.get("sp_plus", 0)
+                                                sp_x -= cost.get("sp_x", 0)
+                                                sp_caret -= cost.get("sp_caret", 0)
+                                                owned_items.append(item_id)
+                                                item_type = recipe.get("type", "device")
                                                 equipped_items[item_type] = item_id
-                                    break  # Buy one at a time
+                                        break
                         
-                        # === BOT SIMULATES PVP (every ~50 wins) ===
-                        if total_wins % 50 == 0 and total_wins > 0:
-                            pvp_won = random.random() < 0.55  # 55% bot win rate
+                        # === 🤖 BOT PVP — Way more frequent, way better win rate ===
+                        if total_wins % BOT_PVP_FREQUENCY == 0 and total_wins > 0:
+                            pvp_won = random.random() < BOT_PVP_WIN_CHANCE
                             if pvp_won:
                                 pvp_wins += 1
-                                pvp_elo += random.randint(15, 30)
+                                pvp_elo += random.randint(20, 45)
                                 pvp_streak += 1
                                 if pvp_streak > pvp_best_streak:
                                     pvp_best_streak = pvp_streak
                             else:
                                 pvp_losses += 1
-                                pvp_elo = max(100, pvp_elo - random.randint(10, 25))
+                                pvp_elo = max(100, pvp_elo - random.randint(5, 15))
                                 pvp_streak = 0
                             pvp_data["elo"] = pvp_elo
                             pvp_data["wins"] = pvp_wins
@@ -13859,19 +14033,19 @@ Type 'help' to see this again.
                     if len(history) > 500:
                         history = history[-500:]
                     
-                    # Save periodically (every 5 rolls to show live activity)
+                    # 🤖 Save very frequently for max spectator visibility
                     roll_batch += 1
-                    if roll_batch >= 5:
+                    if roll_batch >= BOT_SAVE_EVERY:
                         roll_batch = 0
                         _save_all()
                     
-                    # Sleep between rolls (simulate human-like pace)
-                    delay = random.uniform(0.15, 0.6)
+                    # 🤖 SUPER FAST — barely any delay between rolls
+                    delay = random.uniform(BOT_ROLL_DELAY_MIN, BOT_ROLL_DELAY_MAX)
                     stop_event.wait(delay)
                     
                 except Exception as e:
                     # Don't crash the bot on errors, just skip and continue
-                    time.sleep(1)
+                    time.sleep(0.5)
             
             # Final save when stopping
             _save_all()
@@ -13879,7 +14053,7 @@ Type 'help' to see this again.
         # Start the bot thread
         t = threading.Thread(target=_bot_loop, daemon=True, name=f"bot_{bot_name}")
         t.start()
-        return True, f"Bot '{bot_name}' started! Use 'spectateuser {bot_name}' to watch."
+        return True, f"🤖 SUPERCHARGED Bot '{bot_name}' started! 35% win rate | 8x SP | 18% crit | {len(bot_exclusive_items)} exclusive items"
     
     def _stop_bot_player(self, bot_name="BotPlayer"):
         """Stop a running bot player"""
