@@ -13767,9 +13767,9 @@ Type 'help' to see this again.
             BOT_PVP_WIN_CHANCE = 0.75       # 75% PvP win rate (vs 50/50)
             BOT_PVP_FREQUENCY = 8           # PvP every 8 wins (vs 50)
             BOT_SHOP_FREQUENCY = 5          # Shop every 5 wins (vs 20)
-            BOT_SAVE_EVERY = 2              # Save every 2 rolls for max spectator visibility
-            BOT_ROLL_DELAY_MIN = 0.04       # Minimum delay between rolls (FAST)
-            BOT_ROLL_DELAY_MAX = 0.15       # Maximum delay between rolls (FAST)
+            BOT_SAVE_EVERY = 1              # Save every single roll for spectator clarity
+            BOT_ROLL_DELAY_MIN = 0.5        # Minimum delay between rolls (readable)
+            BOT_ROLL_DELAY_MAX = 1.2        # Maximum delay between rolls (readable)
             
             def _save_all():
                 """Persist all bot state to disk"""
