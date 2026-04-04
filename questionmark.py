@@ -14053,7 +14053,7 @@ Type 'help' to see this again.
         # Start the bot thread
         t = threading.Thread(target=_bot_loop, daemon=True, name=f"bot_{bot_name}")
         t.start()
-        return True, f"🤖 SUPERCHARGED Bot '{bot_name}' started! 35% win rate | 8x SP | 18% crit | {len(bot_exclusive_items)} exclusive items"
+        return True, f"🤖 SUPERCHARGED Bot '{bot_name}' started! 35% win rate | 8x SP | 18% crit | 100+ exclusive items"
     
     def _stop_bot_player(self, bot_name="BotPlayer"):
         """Stop a running bot player"""
