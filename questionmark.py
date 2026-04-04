@@ -3439,10 +3439,15 @@ Playstyle Mastery:
         properties = self._analyze_string(s)
         self._update_display(s, properties)
         
-        # Check if this reroll won — string must contain ALL target properties
-        won = self.target_properties <= properties
+        # Check if this reroll won — TWO-STAGE: subset match + luck confirmation
+        subset_match = self.target_properties <= properties
+        won = subset_match and (random.random() < self._get_win_confirmation_chance())
         if won:
             messagebox.showinfo("Reroll Success!", f"🎉 Your reroll was a winner!\nRerolls remaining: {self.reroll_charges}")
+        elif subset_match:
+            matches = len(properties & self.target_properties)
+            total = len(self.target_properties)
+            messagebox.showinfo("🎰 Near Miss!", f"All {total} properties matched but luck wasn't on your side!\n\nKeep trying — you're SO close!\nRerolls remaining: {self.reroll_charges}")
         else:
             matches = len(properties & self.target_properties)
             total = len(self.target_properties)
@@ -5204,12 +5209,31 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         except Exception as e:
             return f"Export failed: {str(e)}"
     
+    def _get_win_confirmation_chance(self):
+        """Return the probability that a subset match converts into an actual win.
+        
+        The game uses a two-stage win check:
+          1. Subset match: string must contain ALL target properties (~19%/7.5%/3.3%)
+          2. Luck confirmation: random roll must beat this threshold
+        
+        Combined effective win rates:
+          Easy:   ~1 in 676 rolls   (19% subset × 0.78% luck)
+          Normal: ~1 in 1,500 rolls  (7.5% subset × 0.89% luck)
+          Hard:   ~1 in 5,000 rolls  (3.3% subset × 0.61% luck)
+        """
+        chances = {
+            "easy":   0.00779,   # ~0.78% → effective 1/676
+            "normal": 0.00889,   # ~0.89% → effective 1/1500
+            "hard":   0.00606,   # ~0.61% → effective 1/5000
+        }
+        return chances.get(self.difficulty, chances["normal"])
+    
     def _generate_target(self):
         """Generate balanced target properties using tiered pools.
         
-        Win condition is SUBSET matching: the rolled string must contain
-        ALL target properties (but can have extras). Target size controls
-        difficulty — more required properties = harder to match them all.
+        Win condition is TWO-STAGE:
+          1. Subset match: rolled string must contain ALL target properties
+          2. Luck confirmation: random chance based on difficulty
         
         Property tiers (based on how often random strings have them):
           Tier 1 (>85%):  has_uppercase, has_lowercase, has_symbols,
@@ -5219,13 +5243,10 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
           Tier 3 (<30%):  is_long, ends_with_symbol, has_spaces,
                           has_multiple_words, is_very_long
         
-        Expected win rates (subset match):
-          Easy   (new):  ~19%  → ~1 in 5 rolls
-          Easy   (50w):  ~11%  → ~1 in 9 rolls
-          Normal (new):  ~7.5% → ~1 in 13 rolls
-          Normal (50w):  ~3%   → ~1 in 33 rolls
-          Hard   (new):  ~3.3% → ~1 in 30 rolls
-          Hard   (50w):  ~1.2% → ~1 in 85 rolls
+        Effective win rates (subset × luck confirmation):
+          Easy:   ~1 in 676 rolls
+          Normal: ~1 in 1,500 rolls
+          Hard:   ~1 in 5,000 rolls
         """
         tier1 = ["has_uppercase", "has_lowercase", "has_symbols",
                  "has_consecutive_letters", "has_numbers", "has_vowels"]
@@ -7970,8 +7991,9 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         if self.player_level >= 3 and self.roll_count % 10 == 0:
             self.reroll_charges = min(self.reroll_charges + 1, 5)
         
-        # Check if won — string must contain ALL target properties (subset match)
-        won = self.target_properties <= properties
+        # Check if won — TWO-STAGE: subset match + luck confirmation
+        subset_match = self.target_properties <= properties
+        won = subset_match and (random.random() < self._get_win_confirmation_chance())
         
         # === PROGRESSION: Critical roll check ===
         is_critical = False
@@ -7982,6 +8004,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         if self.rolls_history:
             self.rolls_history[-1]['won'] = won
             self.rolls_history[-1]['is_critical'] = is_critical
+            self.rolls_history[-1]['near_miss'] = subset_match and not won
         
         # Update match count display
         matches = len(properties & self.target_properties)
@@ -7991,7 +8014,18 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             self.match_label.config(text="Good luck finding 'purple_text'", fg="#ff00ff", font=("Segoe UI", 12, "bold"))
         else:
             match_percent = (matches / total_needed * 100) if total_needed > 0 else 0
-            if match_percent == 100:
+            if subset_match and not won:
+                # Near miss — all properties matched but luck didn't hit
+                color = "#ff6b6b"
+                near_miss_msgs = [
+                    f"{matches}/{total_needed} NEAR MISS! So close...",
+                    f"{matches}/{total_needed} ALMOST! Just need more luck!",
+                    f"{matches}/{total_needed} CLOSE! The stars didn't align...",
+                    f"{matches}/{total_needed} SO CLOSE! Keep rolling!",
+                    f"{matches}/{total_needed} NEAR HIT! Almost had it!",
+                ]
+                text = random.choice(near_miss_msgs)
+            elif match_percent == 100:
                 color = self._ui["success"]
                 text = f"{matches}/{total_needed} PERFECT MATCH!"
             elif match_percent >= 75:
@@ -8294,8 +8328,9 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                 if len(self.rolls_history) > 100:
                     self.rolls_history.pop(0)
                 
-                # Check if won — string must contain ALL target properties (subset match)
-                won = self.target_properties <= properties
+                # Check if won — TWO-STAGE: subset match + luck confirmation
+                subset_match = self.target_properties <= properties
+                won = subset_match and (random.random() < self._get_win_confirmation_chance())
                 
                 # Apply temporary effects
                 self._update_temp_effect('temp_luck_boost')
@@ -13984,8 +14019,8 @@ Type 'help' to see this again.
                     matches = len(properties & target)
                     
                     # 🤖 BOT SUPER LUCK: Force wins way more often!
-                    # Normal win = target is subset of properties. Bot can also FORCE it.
-                    natural_win = (target <= properties)
+                    # Normal win = target subset match + luck confirmation. Bot can also FORCE it.
+                    natural_win = (target <= properties) and (random.random() < 0.00889)
                     forced_win = (not natural_win) and (random.random() < BOT_WIN_CHANCE)
                     won = natural_win or forced_win
                     
