@@ -7577,6 +7577,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         for username in self.account_manager.accounts:
             if username.startswith("Guest_"):
                 continue
+            # Exclude bots from player leaderboards
+            acct_data = self.account_manager.accounts.get(username, {})
+            if acct_data.get("title") in ("🤖 Bot", "🤖 testbot", "testbot"):
+                continue
             stats_file = self.account_manager.get_user_stats_file(username)
             meta_file = f"user_{username}_meta.json"
             pvp_file = f"user_{username}_pvp.json"
@@ -7610,7 +7614,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                 "name": username, "wins": wins, "rolls": rolls, "streak": streak,
                 "level": level, "win_rate": win_rate, "play_time": play_time,
                 "elo": elo, "pvp_wins": pvp_wins, "pvp_losses": pvp_losses,
-                "title": self._get_player_title_for_wins(wins),
+                "title": self._get_player_title_for_wins(wins, username=username),
             })
 
         # ── Your profile card ────────────────────────────────────────
@@ -7736,10 +7740,16 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         for _, key, desc in tab_defs:
             _fill_tab(key, key, desc)
 
-    def _get_player_title_for_wins(self, wins):
-        """Get title based on wins count"""
-        # Special unique title for DeMarcusThe2nd
-        if getattr(self, "current_username", None) == "DeMarcusThe2nd":
+    def _get_player_title_for_wins(self, wins, username=None):
+        """Get title based on wins count. 'The One And Only' is exclusive to DeMarcusThe2nd."""
+        # Determine which user we're checking
+        check_user = username or getattr(self, "current_username", None)
+        # Check if this is a bot account — bots get 'testbot' title
+        acct = self.account_manager.accounts.get(check_user, {}) if hasattr(self, 'account_manager') else {}
+        if acct.get("title") in ("🤖 Bot", "🤖 testbot", "testbot"):
+            return "🤖 testbot"
+        # Special unique title ONLY for DeMarcusThe2nd
+        if check_user == "DeMarcusThe2nd":
             return "👑 The One And Only"
         if wins >= 500:
             return "⚜️ Mythic"
@@ -9541,6 +9551,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         for username in self.account_manager.accounts:
             if username.startswith("Guest_"):
                 continue
+            # Exclude bots from PvP leaderboard
+            acct_data = self.account_manager.accounts.get(username, {})
+            if acct_data.get("title") in ("🤖 Bot", "🤖 testbot", "testbot"):
+                continue
             pvp_file = f"user_{username}_pvp.json"
             try:
                 if os.path.exists(pvp_file):
@@ -10889,6 +10903,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             entries = []
             for username in self.account_manager.accounts:
                 if username.startswith("Guest_"):
+                    continue
+                # Exclude bots from tournament leaderboard
+                acct_data = self.account_manager.accounts.get(username, {})
+                if acct_data.get("title") in ("🤖 Bot", "🤖 testbot", "testbot"):
                     continue
                 t_file = f"user_{username}_tournament.json"
                 try:
@@ -13503,7 +13521,7 @@ Type 'help' to see this again.
                 "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "last_played": None,
                 "play_time": 0,
-                "title": "🤖 Bot"
+                "title": "🤖 testbot"
             }
             self.account_manager.accounts = accounts
             self.account_manager._save_accounts()
