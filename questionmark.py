@@ -120,6 +120,14 @@ class AccountManager:
         """Get history file path for a user"""
         return f"user_{username}_history.json"
     
+    def get_user_crafting_file(self, username):
+        """Get crafting data file path for a user"""
+        return f"user_{username}_crafting.json"
+    
+    def get_user_pokedex_file(self, username):
+        """Get Pokédex data file path for a user"""
+        return f"user_{username}_pokedex.json"
+    
     def save_remembered_account(self, username, password=None):
         """Save account for auto-login (expires in 30 days)"""
         remembered_file = "remembered_accounts.json"
@@ -377,6 +385,15 @@ class RollingGame:
         
         # ── PvP Arena System ─────────────────────────────────────────────
         self._init_pvp_system()
+        
+        # ── Crafting Overhaul System ─────────────────────────────────────
+        self._init_crafting_system()
+        
+        # ── Clans/Guilds System ──────────────────────────────────────────
+        self._init_clan_system()
+        
+        # ── String Pokédex System ────────────────────────────────────────
+        self._init_pokedex_system()
         
         # Difficulty setting
         self.difficulty = "normal"
@@ -753,6 +770,501 @@ class RollingGame:
             "equipped": {"gauntlet": self.equipped_gauntlet, "device": self.equipped_device}
         }
         self._save_json(eq_file, eq_data)
+    
+    # ===== CRAFTING OVERHAUL SYSTEM =====
+    
+    def _init_crafting_system(self):
+        """Initialize the advanced crafting system with property-combo recipes"""
+        craft_file = self.account_manager.get_user_crafting_file(self.current_username) if self.current_username else "crafting.json"
+        saved = self._load_json(craft_file, {})
+        
+        self.discovered_combos = set()
+        for combo in saved.get("discovered_combos", []):
+            self.discovered_combos.add(frozenset(combo))
+        self.crafted_items = saved.get("crafted_items", [])
+        self.crafting_xp = saved.get("crafting_xp", 0)
+        self.crafting_level = saved.get("crafting_level", 1)
+        
+        # Property-combo crafting recipes
+        self.crafting_recipes = {
+            # ── Tier 1: 2-property combos (Common) ──
+            "ember_gauntlet": {
+                "name": "🔥 Ember Gauntlet", "tier": 1, "type": "gauntlet",
+                "combo": frozenset(["has_numbers", "has_uppercase"]),
+                "cost": {"sp": 25}, "crafting_level": 1,
+                "effect": {"sp_bonus": 0.10},
+                "desc": "+10% SP gain from wins",
+            },
+            "frost_lens": {
+                "name": "❄️ Frost Lens", "tier": 1, "type": "device",
+                "combo": frozenset(["has_lowercase", "has_vowels"]),
+                "cost": {"sp": 25}, "crafting_level": 1,
+                "effect": {"xp_bonus": 0.10},
+                "desc": "+10% XP gain from wins",
+            },
+            "iron_bracer": {
+                "name": "🛡️ Iron Bracer", "tier": 1, "type": "gauntlet",
+                "combo": frozenset(["has_symbols", "has_punctuation"]),
+                "cost": {"sp": 30}, "crafting_level": 1,
+                "effect": {"streak_shield": 0.15},
+                "desc": "15% chance to protect win streak",
+            },
+            "scout_monocle": {
+                "name": "🔍 Scout Monocle", "tier": 1, "type": "device",
+                "combo": frozenset(["starts_with_letter", "ends_with_symbol"]),
+                "cost": {"sp": 30}, "crafting_level": 1,
+                "effect": {"reveal_property": 1},
+                "desc": "Reveals 1 extra target property hint",
+            },
+            "swift_gloves": {
+                "name": "⚡ Swift Gloves", "tier": 1, "type": "gauntlet",
+                "combo": frozenset(["is_long", "has_spaces"]),
+                "cost": {"sp": 20}, "crafting_level": 1,
+                "effect": {"roll_speed": 0.10},
+                "desc": "+10% auto-roll speed",
+            },
+            # ── Tier 2: 3-property combos (Uncommon) ──
+            "storm_caller": {
+                "name": "⛈️ Storm Caller", "tier": 2, "type": "gauntlet",
+                "combo": frozenset(["has_numbers", "has_uppercase", "has_symbols"]),
+                "cost": {"sp": 50, "sp_plus": 3}, "crafting_level": 3,
+                "effect": {"sp_bonus": 0.20, "critical_chance": 0.02},
+                "desc": "+20% SP, +2% critical roll chance",
+            },
+            "crystal_scanner": {
+                "name": "🔮 Crystal Scanner", "tier": 2, "type": "device",
+                "combo": frozenset(["has_vowels", "has_consecutive_letters", "starts_with_letter"]),
+                "cost": {"sp": 50, "sp_plus": 3}, "crafting_level": 3,
+                "effect": {"reveal_property": 2, "xp_bonus": 0.10},
+                "desc": "Reveals 2 extra properties, +10% XP",
+            },
+            "void_wrap": {
+                "name": "🌑 Void Wrap", "tier": 2, "type": "gauntlet",
+                "combo": frozenset(["has_repeats", "has_operators", "has_numbers"]),
+                "cost": {"sp": 60, "sp_plus": 5}, "crafting_level": 4,
+                "effect": {"sp_bonus": 0.15, "streak_shield": 0.25},
+                "desc": "+15% SP, 25% streak protection",
+            },
+            "oracle_device": {
+                "name": "🌟 Oracle Device", "tier": 2, "type": "device",
+                "combo": frozenset(["has_multiple_words", "has_spaces", "is_long"]),
+                "cost": {"sp": 55, "sp_plus": 4}, "crafting_level": 3,
+                "effect": {"xp_bonus": 0.25, "luck": 0.05},
+                "desc": "+25% XP, +5% luck boost",
+            },
+            "thunder_fist": {
+                "name": "🥊 Thunder Fist", "tier": 2, "type": "gauntlet",
+                "combo": frozenset(["has_uppercase", "has_lowercase", "has_punctuation"]),
+                "cost": {"sp": 45, "sp_plus": 3}, "crafting_level": 3,
+                "effect": {"sp_bonus": 0.18, "reroll_gen": 0.05},
+                "desc": "+18% SP, 5% chance for free reroll",
+            },
+            # ── Tier 3: 4-property combos (Rare) ──
+            "dragon_claw": {
+                "name": "🐉 Dragon Claw", "tier": 3, "type": "gauntlet",
+                "combo": frozenset(["has_numbers", "has_symbols", "has_uppercase", "is_long"]),
+                "cost": {"sp": 100, "sp_plus": 10, "sp_x": 3}, "crafting_level": 6,
+                "effect": {"sp_bonus": 0.35, "critical_chance": 0.05},
+                "desc": "+35% SP, +5% critical chance",
+            },
+            "astral_projector": {
+                "name": "🌌 Astral Projector", "tier": 3, "type": "device",
+                "combo": frozenset(["has_vowels", "has_consecutive_letters", "has_lowercase", "starts_with_letter"]),
+                "cost": {"sp": 100, "sp_plus": 10, "sp_x": 3}, "crafting_level": 6,
+                "effect": {"xp_bonus": 0.40, "reveal_property": 3},
+                "desc": "+40% XP, reveals 3 extra properties",
+            },
+            "shadow_gauntlet": {
+                "name": "🌘 Shadow Gauntlet", "tier": 3, "type": "gauntlet",
+                "combo": frozenset(["has_repeats", "has_operators", "has_punctuation", "has_symbols"]),
+                "cost": {"sp": 120, "sp_plus": 8, "sp_x": 4}, "crafting_level": 7,
+                "effect": {"sp_bonus": 0.30, "streak_shield": 0.40, "luck": 0.05},
+                "desc": "+30% SP, 40% streak protect, +5% luck",
+            },
+            "phoenix_eye": {
+                "name": "🔥 Phoenix Eye", "tier": 3, "type": "device",
+                "combo": frozenset(["has_numbers", "has_uppercase", "has_multiple_words", "has_spaces"]),
+                "cost": {"sp": 110, "sp_plus": 10, "sp_x": 2}, "crafting_level": 6,
+                "effect": {"xp_bonus": 0.30, "sp_bonus": 0.15, "critical_chance": 0.03},
+                "desc": "+30% XP, +15% SP, +3% critical",
+            },
+            # ── Tier 4: 5-property combos (Epic) ──
+            "titan_grip": {
+                "name": "💎 Titan Grip", "tier": 4, "type": "gauntlet",
+                "combo": frozenset(["has_numbers", "has_symbols", "has_uppercase", "has_lowercase", "is_long"]),
+                "cost": {"sp": 200, "sp_plus": 20, "sp_x": 8, "sp_caret": 2}, "crafting_level": 9,
+                "effect": {"sp_bonus": 0.50, "critical_chance": 0.08, "streak_shield": 0.30},
+                "desc": "+50% SP, +8% crit, 30% streak shield",
+            },
+            "cosmos_engine": {
+                "name": "🌠 Cosmos Engine", "tier": 4, "type": "device",
+                "combo": frozenset(["has_vowels", "has_consecutive_letters", "has_multiple_words", "has_spaces", "starts_with_letter"]),
+                "cost": {"sp": 200, "sp_plus": 20, "sp_x": 8, "sp_caret": 2}, "crafting_level": 9,
+                "effect": {"xp_bonus": 0.60, "reveal_property": 4, "luck": 0.10},
+                "desc": "+60% XP, reveals 4 props, +10% luck",
+            },
+            # ── Tier 5: 6+ property combos (Legendary) ──
+            "infinity_forge": {
+                "name": "♾️ Infinity Forge", "tier": 5, "type": "gauntlet",
+                "combo": frozenset(["has_numbers", "has_symbols", "has_uppercase", "has_lowercase", "is_long", "has_repeats"]),
+                "cost": {"sp": 500, "sp_plus": 50, "sp_x": 15, "sp_caret": 5}, "crafting_level": 12,
+                "effect": {"sp_bonus": 0.75, "critical_chance": 0.12, "streak_shield": 0.50, "luck": 0.10},
+                "desc": "+75% SP, +12% crit, 50% shield, +10% luck",
+            },
+            "omniscient_core": {
+                "name": "🧿 Omniscient Core", "tier": 5, "type": "device",
+                "combo": frozenset(["has_vowels", "has_consecutive_letters", "has_multiple_words", "is_very_long", "has_spaces", "starts_with_letter"]),
+                "cost": {"sp": 500, "sp_plus": 50, "sp_x": 15, "sp_caret": 5}, "crafting_level": 12,
+                "effect": {"xp_bonus": 1.00, "reveal_property": 5, "luck": 0.15, "critical_chance": 0.05},
+                "desc": "+100% XP, reveals 5 props, +15% luck, +5% crit",
+            },
+            "world_ender": {
+                "name": "💀 World Ender", "tier": 5, "type": "gauntlet",
+                "combo": frozenset(["has_numbers", "has_symbols", "has_operators", "has_uppercase", "has_lowercase", "is_long", "has_punctuation"]),
+                "cost": {"sp": 750, "sp_plus": 75, "sp_x": 25, "sp_caret": 8}, "crafting_level": 15,
+                "effect": {"sp_bonus": 1.00, "critical_chance": 0.15, "streak_shield": 0.60, "luck": 0.15, "reroll_gen": 0.10},
+                "desc": "+100% SP, +15% crit, 60% shield, +15% luck",
+            },
+        }
+        
+        # Tier descriptions and colors
+        self.crafting_tiers = {
+            1: {"name": "Common", "color": "#b0bec5", "icon": "⚪"},
+            2: {"name": "Uncommon", "color": "#66bb6a", "icon": "🟢"},
+            3: {"name": "Rare", "color": "#42a5f5", "icon": "🔵"},
+            4: {"name": "Epic", "color": "#ab47bc", "icon": "🟣"},
+            5: {"name": "Legendary", "color": "#ffa726", "icon": "🟠"},
+        }
+    
+    def _save_crafting_data(self):
+        """Save crafting system data"""
+        craft_file = self.account_manager.get_user_crafting_file(self.current_username) if self.current_username else "crafting.json"
+        data = {
+            "discovered_combos": [list(c) for c in self.discovered_combos],
+            "crafted_items": self.crafted_items,
+            "crafting_xp": self.crafting_xp,
+            "crafting_level": self.crafting_level,
+        }
+        self._save_json(craft_file, data)
+    
+    def _check_crafting_discoveries(self, properties):
+        """Check if current winning roll's properties unlock any new crafting combos"""
+        from itertools import combinations
+        props_list = list(properties)
+        new_discoveries = 0
+        for size in range(2, min(len(props_list) + 1, 8)):
+            for combo in combinations(props_list, size):
+                fs = frozenset(combo)
+                if fs not in self.discovered_combos:
+                    for recipe_id, recipe in self.crafting_recipes.items():
+                        if recipe["combo"] == fs:
+                            self.discovered_combos.add(fs)
+                            new_discoveries += 1
+                            self.crafting_xp += recipe["tier"] * 15
+                            xp_needed = self.crafting_level * 50
+                            while self.crafting_xp >= xp_needed:
+                                self.crafting_xp -= xp_needed
+                                self.crafting_level += 1
+                                xp_needed = self.crafting_level * 50
+                            break
+        if new_discoveries > 0:
+            self._save_crafting_data()
+            try:
+                self.root.after(500, lambda n=new_discoveries: messagebox.showinfo(
+                    "🔨 New Recipe Discovered!",
+                    f"You discovered {n} new crafting recipe{'s' if n > 1 else ''}!\n\n"
+                    f"Open the Crafting Bench to see what you can forge!"
+                ))
+            except:
+                pass
+        return new_discoveries
+    
+    def _craft_item(self, item_id):
+        """Craft an item from the advanced crafting bench"""
+        if item_id not in self.crafting_recipes:
+            return False, "Recipe not found"
+        recipe = self.crafting_recipes[item_id]
+        
+        if recipe["combo"] not in self.discovered_combos:
+            return False, "Recipe not yet discovered"
+        if self.crafting_level < recipe["crafting_level"]:
+            return False, f"Requires Crafting Level {recipe['crafting_level']} (yours: {self.crafting_level})"
+        if item_id in self.crafted_items:
+            return False, "Already crafted this item"
+        
+        cost = recipe["cost"]
+        if cost.get("sp", 0) > self.sp:
+            return False, f"Need {cost['sp']} SP (have {self.sp})"
+        if cost.get("sp_plus", 0) > self.sp_plus:
+            return False, f"Need {cost['sp_plus']} SP+ (have {self.sp_plus})"
+        if cost.get("sp_x", 0) > self.sp_x:
+            return False, f"Need {cost['sp_x']} SPx (have {self.sp_x})"
+        if cost.get("sp_caret", 0) > self.sp_caret:
+            return False, f"Need {cost['sp_caret']} SP^ (have {self.sp_caret})"
+        
+        self.sp -= cost.get("sp", 0)
+        self.sp_plus -= cost.get("sp_plus", 0)
+        self.sp_x -= cost.get("sp_x", 0)
+        self.sp_caret -= cost.get("sp_caret", 0)
+        self.crafted_items.append(item_id)
+        self.crafting_xp += recipe["tier"] * 25
+        xp_needed = self.crafting_level * 50
+        while self.crafting_xp >= xp_needed:
+            self.crafting_xp -= xp_needed
+            self.crafting_level += 1
+            xp_needed = self.crafting_level * 50
+        
+        self._save_crafting_data()
+        self._save_equipment()
+        self._update_sp_label()
+        return True, f"Crafted {recipe['name']}!"
+    
+    def _get_crafting_bonuses(self):
+        """Calculate total bonuses from all crafted items"""
+        bonuses = {"sp_bonus": 0.0, "xp_bonus": 0.0, "critical_chance": 0.0,
+                   "streak_shield": 0.0, "luck": 0.0, "reveal_property": 0,
+                   "roll_speed": 0.0, "reroll_gen": 0.0}
+        for item_id in self.crafted_items:
+            if item_id in self.crafting_recipes:
+                recipe = self.crafting_recipes[item_id]
+                for key, value in recipe["effect"].items():
+                    bonuses[key] = bonuses.get(key, 0) + value
+        return bonuses
+    
+    # ===== CLANS / GUILDS SYSTEM =====
+    
+    def _init_clan_system(self):
+        """Initialize the Clans/Guilds system"""
+        self.clans_data = self._load_json("clans.json", {"clans": {}})
+        
+        self.player_clan = None
+        if self.current_username:
+            for clan_name, clan_info in self.clans_data.get("clans", {}).items():
+                if self.current_username in clan_info.get("members", []):
+                    self.player_clan = clan_name
+                    break
+        
+        self.clan_perks = {
+            2: {"name": "Fellowship", "desc": "+5% XP for all members", "effect": {"xp_bonus": 0.05}},
+            4: {"name": "Shared Fortune", "desc": "+5% SP for all members", "effect": {"sp_bonus": 0.05}},
+            6: {"name": "Lucky Clovers", "desc": "+2% critical chance", "effect": {"critical_chance": 0.02}},
+            8: {"name": "Iron Will", "desc": "15% streak protection", "effect": {"streak_shield": 0.15}},
+            10: {"name": "Golden Touch", "desc": "+10% SP for all members", "effect": {"sp_bonus": 0.10}},
+            12: {"name": "Wisdom", "desc": "+10% XP for all members", "effect": {"xp_bonus": 0.10}},
+            15: {"name": "Legendary Bond", "desc": "+5% critical, +5% luck", "effect": {"critical_chance": 0.05, "luck": 0.05}},
+            20: {"name": "Transcendence", "desc": "+25% all gains", "effect": {"sp_bonus": 0.25, "xp_bonus": 0.25}},
+        }
+    
+    def _save_clan_data(self):
+        """Save global clan data"""
+        self._save_json("clans.json", self.clans_data)
+    
+    def _get_clan_level(self, clan_name):
+        """Calculate clan level from XP"""
+        clan = self.clans_data.get("clans", {}).get(clan_name, {})
+        xp = clan.get("total_xp", 0)
+        level = 1
+        xp_needed = 100
+        while xp >= xp_needed:
+            xp -= xp_needed
+            level += 1
+            xp_needed = level * 100
+        return level, xp, level * 100
+    
+    def _get_clan_perks(self, clan_name):
+        """Get active perks for a clan based on its level"""
+        level, _, _ = self._get_clan_level(clan_name)
+        active_perks = {}
+        for perk_level, perk_data in self.clan_perks.items():
+            if level >= perk_level:
+                for key, value in perk_data["effect"].items():
+                    active_perks[key] = active_perks.get(key, 0) + value
+        return active_perks
+    
+    def _contribute_clan_xp(self, sp_gained):
+        """Contribute XP to the player's clan after a win"""
+        if not self.player_clan:
+            return
+        clans = self.clans_data.get("clans", {})
+        if self.player_clan not in clans:
+            return
+        clan = clans[self.player_clan]
+        contribution = max(1, sp_gained // 2)
+        clan["total_xp"] = clan.get("total_xp", 0) + contribution
+        if "contributions" not in clan:
+            clan["contributions"] = {}
+        clan["contributions"][self.current_username] = clan["contributions"].get(self.current_username, 0) + contribution
+        clan["total_wins"] = clan.get("total_wins", 0) + 1
+        self._save_clan_data()
+    
+    def _get_clan_bonuses(self):
+        """Get total bonuses from clan perks"""
+        if not self.player_clan:
+            return {}
+        return self._get_clan_perks(self.player_clan)
+    
+    def _create_clan(self, clan_name):
+        """Create a new clan"""
+        if not self.current_username:
+            return False, "Must be logged in"
+        if self.player_clan:
+            return False, "Already in a clan — leave first"
+        clan_name = clan_name.strip()
+        if not clan_name or len(clan_name) < 3 or len(clan_name) > 20:
+            return False, "Clan name must be 3-20 characters"
+        if clan_name in self.clans_data.get("clans", {}):
+            return False, "Clan name already taken"
+        
+        self.clans_data.setdefault("clans", {})[clan_name] = {
+            "leader": self.current_username,
+            "members": [self.current_username],
+            "total_xp": 0,
+            "total_wins": 0,
+            "contributions": {self.current_username: 0},
+            "created": __import__("datetime").datetime.now().isoformat(),
+            "motto": "A new clan rises!",
+        }
+        self.player_clan = clan_name
+        self._save_clan_data()
+        return True, f"Clan '{clan_name}' created!"
+    
+    def _join_clan(self, clan_name):
+        """Join an existing clan"""
+        if not self.current_username:
+            return False, "Must be logged in"
+        if self.player_clan:
+            return False, "Already in a clan — leave first"
+        if clan_name not in self.clans_data.get("clans", {}):
+            return False, "Clan not found"
+        
+        clan = self.clans_data["clans"][clan_name]
+        if len(clan.get("members", [])) >= 20:
+            return False, "Clan is full (max 20 members)"
+        if self.current_username in clan.get("members", []):
+            return False, "Already a member"
+        
+        clan.setdefault("members", []).append(self.current_username)
+        clan.setdefault("contributions", {})[self.current_username] = 0
+        self.player_clan = clan_name
+        self._save_clan_data()
+        return True, f"Joined '{clan_name}'!"
+    
+    def _leave_clan(self):
+        """Leave current clan"""
+        if not self.player_clan:
+            return False, "Not in a clan"
+        clan = self.clans_data.get("clans", {}).get(self.player_clan, {})
+        if clan.get("leader") == self.current_username:
+            members = [m for m in clan.get("members", []) if m != self.current_username]
+            if members:
+                clan["leader"] = members[0]
+                clan["members"] = members
+            else:
+                del self.clans_data["clans"][self.player_clan]
+        else:
+            clan["members"] = [m for m in clan.get("members", []) if m != self.current_username]
+        
+        old_name = self.player_clan
+        self.player_clan = None
+        self._save_clan_data()
+        return True, f"Left '{old_name}'"
+    
+    # ===== STRING POKÉDEX SYSTEM =====
+    
+    def _init_pokedex_system(self):
+        """Initialize the String Pokédex collection system"""
+        pdx_file = self.account_manager.get_user_pokedex_file(self.current_username) if self.current_username else "pokedex.json"
+        saved = self._load_json(pdx_file, {})
+        
+        self.pokedex_entries = saved.get("entries", [])
+        self.pokedex_total_caught = saved.get("total_caught", 0)
+        self.pokedex_unique_combos = set()
+        for combo in saved.get("unique_combos", []):
+            self.pokedex_unique_combos.add(frozenset(combo))
+        
+        self.rarity_tiers = {
+            1: {"name": "Common", "color": "#b0bec5", "icon": "⬜", "stars": "★"},
+            2: {"name": "Common", "color": "#b0bec5", "icon": "⬜", "stars": "★★"},
+            3: {"name": "Uncommon", "color": "#66bb6a", "icon": "🟩", "stars": "★★★"},
+            4: {"name": "Rare", "color": "#42a5f5", "icon": "🟦", "stars": "★★★★"},
+            5: {"name": "Epic", "color": "#ab47bc", "icon": "🟪", "stars": "★★★★★"},
+            6: {"name": "Legendary", "color": "#ffa726", "icon": "🟧", "stars": "★★★★★★"},
+        }
+    
+    def _save_pokedex(self):
+        """Save Pokédex data"""
+        pdx_file = self.account_manager.get_user_pokedex_file(self.current_username) if self.current_username else "pokedex.json"
+        data = {
+            "entries": self.pokedex_entries[-500:],
+            "total_caught": self.pokedex_total_caught,
+            "unique_combos": [list(c) for c in self.pokedex_unique_combos],
+        }
+        self._save_json(pdx_file, data)
+    
+    def _record_pokedex_entry(self, string, properties):
+        """Record a winning string in the Pokédex"""
+        import datetime as _dt
+        prop_count = len(properties)
+        rarity_level = min(prop_count, 6) if prop_count >= 1 else 1
+        rarity_key = max(1, rarity_level)
+        rarity = self.rarity_tiers.get(rarity_key, self.rarity_tiers[1])
+        
+        if prop_count >= 7:
+            rarity_name = "Mythic"
+            rarity_color = "#ff4081"
+            rarity_icon = "💜"
+            rarity_stars = "★★★★★★★"
+        else:
+            rarity_name = rarity["name"]
+            rarity_color = rarity["color"]
+            rarity_icon = rarity["icon"]
+            rarity_stars = rarity["stars"]
+        
+        combo_key = frozenset(properties)
+        is_new_combo = combo_key not in self.pokedex_unique_combos
+        if is_new_combo:
+            self.pokedex_unique_combos.add(combo_key)
+        
+        entry = {
+            "id": self.pokedex_total_caught + 1,
+            "string": string,
+            "properties": sorted(list(properties)),
+            "property_count": prop_count,
+            "rarity": rarity_name,
+            "rarity_color": rarity_color,
+            "rarity_icon": rarity_icon,
+            "stars": rarity_stars,
+            "is_new_combo": is_new_combo,
+            "timestamp": _dt.datetime.now().isoformat(),
+        }
+        
+        self.pokedex_entries.append(entry)
+        self.pokedex_total_caught += 1
+        if len(self.pokedex_entries) > 500:
+            self.pokedex_entries = self.pokedex_entries[-500:]
+        
+        self._save_pokedex()
+        return entry
+    
+    def _get_pokedex_stats(self):
+        """Get Pokédex collection statistics"""
+        rarity_counts = {"Common": 0, "Uncommon": 0, "Rare": 0, "Epic": 0, "Legendary": 0, "Mythic": 0}
+        for entry in self.pokedex_entries:
+            r = entry.get("rarity", "Common")
+            rarity_counts[r] = rarity_counts.get(r, 0) + 1
+        
+        total_possible_combos = 0
+        for size in range(1, 8):
+            from math import comb
+            total_possible_combos += comb(15, size)
+        
+        return {
+            "total_caught": self.pokedex_total_caught,
+            "entries_stored": len(self.pokedex_entries),
+            "unique_combos": len(self.pokedex_unique_combos),
+            "total_possible_combos": total_possible_combos,
+            "rarity_counts": rarity_counts,
+        }
     
     # ===== SHOP/MARKETPLACE SYSTEM =====
     
@@ -5409,7 +5921,8 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         # ── Group 2: Progression ──
         _nav_btn(nav_inner, "📈", "Progress",     self.show_progression_window,  ui["xp_color"])
         _nav_btn(nav_inner, "⚔️", "Equip",        self.show_equipment_window,    ui["danger"])
-        _nav_btn(nav_inner, "🛒", "Shop",         self.show_shop_window,         ui["sp_color"])
+        _nav_btn(nav_inner, "�", "Craft",        self.show_crafting_bench,      ui["gold"])
+        _nav_btn(nav_inner, "�🛒", "Shop",         self.show_shop_window,         ui["sp_color"])
         _nav_btn(nav_inner, "🎯", "Strategy",     self.show_strategy_window,     ui["accent"])
 
         _nav_sep(nav_inner)
@@ -5423,7 +5936,13 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
 
         _nav_sep(nav_inner)
 
-        # ── Group 4: System ──
+        # ── Group 4: Social & Collection ──
+        _nav_btn(nav_inner, "🏰", "Clans",       self.show_clans_window,        ui["warning"])
+        _nav_btn(nav_inner, "📚", "Pokédex",     self.show_pokedex_window,      ui["info"])
+
+        _nav_sep(nav_inner)
+
+        # ── Group 5: System ──
         _nav_btn(nav_inner, "⚙️", "Settings",     self.show_settings_window,     ui["text_secondary"])
         _nav_btn(nav_inner, "📖", "Tutorial",     self.start_tutorial,           ui["text_secondary"])
         
@@ -7594,6 +8113,11 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             self._save_achievements()
             self._save_equipment()
             self._save_challenge_progress()
+            
+            # === NEW SYSTEMS: Pokédex, Clan XP, Crafting Discoveries ===
+            self._record_pokedex_entry(s, properties)
+            self._contribute_clan_xp(sp_gained)
+            self._check_crafting_discoveries(properties)
             
             # Update unlock progress bar
             if hasattr(self, 'unlock_progress_label'):
@@ -11242,6 +11766,594 @@ DISCOVERY STATS:
 """
         prog_text.insert(tk.END, progression_info)
         prog_text.config(state=tk.DISABLED)
+    
+    # ===== CRAFTING BENCH WINDOW =====
+    
+    def show_crafting_bench(self):
+        """Show the advanced crafting bench window"""
+        ui = self._ui
+        craft_win = self._styled_toplevel("🔨 Advanced Crafting Bench", 880, 740)
+        self._styled_header(craft_win, "Advanced Crafting Bench",
+                            "Discover property combos from wins → Forge powerful gear", icon="🔨")
+        
+        # ── Top stats bar ──
+        stats_outer, stats_card = self._styled_card(craft_win, "Crafting Stats")
+        stats_outer.pack(fill=tk.X, padx=15, pady=(10, 5))
+        
+        xp_needed = self.crafting_level * 50
+        discovered = len(self.discovered_combos)
+        total_recipes = len(self.crafting_recipes)
+        crafted_count = len(self.crafted_items)
+        
+        stats_row = tk.Frame(stats_card, bg=ui["bg_card"])
+        stats_row.pack(fill=tk.X)
+        
+        for label_text, value_text, color in [
+            ("Crafting Level", str(self.crafting_level), ui["accent_light"]),
+            ("XP", f"{self.crafting_xp}/{xp_needed}", ui["xp_color"]),
+            ("Discovered", f"{discovered}/{total_recipes}", ui["info"]),
+            ("Crafted", f"{crafted_count}/{total_recipes}", ui["success"]),
+            ("SP", f"{self.sp}|{self.sp_plus}|{self.sp_x}|{self.sp_caret}", ui["sp_color"]),
+        ]:
+            pill = tk.Frame(stats_row, bg=ui["bg_secondary"], padx=10, pady=6)
+            pill.pack(side=tk.LEFT, padx=4, fill=tk.X, expand=True)
+            tk.Label(pill, text=label_text, font=ui["font_small"], bg=ui["bg_secondary"],
+                     fg=ui["text_muted"]).pack()
+            tk.Label(pill, text=value_text, font=ui["font_body_bold"], bg=ui["bg_secondary"],
+                     fg=color).pack()
+        
+        # ── Filter buttons ──
+        filter_frame = tk.Frame(craft_win, bg=ui["bg_primary"])
+        filter_frame.pack(fill=tk.X, padx=15, pady=5)
+        
+        current_filter = [0]  # 0=All, 1-5=tier
+        
+        def refresh_recipes():
+            for widget in scrollable_frame.winfo_children():
+                widget.destroy()
+            
+            tier_filter = current_filter[0]
+            for item_id, recipe in sorted(self.crafting_recipes.items(), key=lambda x: (x[1]["tier"], x[1]["name"])):
+                if tier_filter > 0 and recipe["tier"] != tier_filter:
+                    continue
+                
+                tier_info = self.crafting_tiers[recipe["tier"]]
+                is_discovered = recipe["combo"] in self.discovered_combos
+                is_crafted = item_id in self.crafted_items
+                can_craft = is_discovered and not is_crafted and self.crafting_level >= recipe["crafting_level"]
+                
+                # Recipe card
+                card_bg = ui["bg_card"] if not is_crafted else "#1a2a1a"
+                row = tk.Frame(scrollable_frame, bg=card_bg, pady=8, padx=12)
+                row.pack(fill=tk.X, padx=5, pady=3)
+                
+                # Left: icon + name
+                left = tk.Frame(row, bg=card_bg)
+                left.pack(side=tk.LEFT, fill=tk.Y)
+                
+                name_color = tier_info["color"] if is_discovered else ui["text_muted"]
+                tk.Label(left, text=f"{tier_info['icon']} {recipe['name']}", font=ui["font_body_bold"],
+                         bg=card_bg, fg=name_color, anchor="w").pack(anchor="w")
+                
+                tier_text = f"Tier {recipe['tier']}: {tier_info['name']} • {recipe['type'].capitalize()}"
+                if is_crafted:
+                    tier_text += " • ✅ CRAFTED"
+                tk.Label(left, text=tier_text, font=ui["font_small"],
+                         bg=card_bg, fg=tier_info["color"], anchor="w").pack(anchor="w")
+                
+                # Combo display
+                if is_discovered:
+                    combo_text = " + ".join(sorted(recipe["combo"]))
+                    combo_color = ui["success"]
+                    combo_prefix = "🔓 "
+                else:
+                    combo_text = " + ".join(["???" for _ in recipe["combo"]])
+                    combo_color = ui["text_muted"]
+                    combo_prefix = "🔒 "
+                tk.Label(left, text=f"{combo_prefix}{combo_text}", font=ui["font_small"],
+                         bg=card_bg, fg=combo_color, anchor="w").pack(anchor="w")
+                
+                tk.Label(left, text=recipe["desc"], font=ui["font_small"],
+                         bg=card_bg, fg=ui["text_secondary"], anchor="w").pack(anchor="w")
+                
+                # Right: cost + craft button
+                right = tk.Frame(row, bg=card_bg)
+                right.pack(side=tk.RIGHT, fill=tk.Y)
+                
+                cost_parts = []
+                cost = recipe["cost"]
+                if cost.get("sp", 0): cost_parts.append(f"{cost['sp']} SP")
+                if cost.get("sp_plus", 0): cost_parts.append(f"{cost['sp_plus']} SP+")
+                if cost.get("sp_x", 0): cost_parts.append(f"{cost['sp_x']} SPx")
+                if cost.get("sp_caret", 0): cost_parts.append(f"{cost['sp_caret']} SP^")
+                cost_text = " • ".join(cost_parts)
+                
+                tk.Label(right, text=cost_text, font=ui["font_small"],
+                         bg=card_bg, fg=ui["gold"], anchor="e").pack(anchor="e")
+                
+                if recipe["crafting_level"] > self.crafting_level:
+                    tk.Label(right, text=f"Req. Level {recipe['crafting_level']}", font=ui["font_small"],
+                             bg=card_bg, fg=ui["danger"], anchor="e").pack(anchor="e")
+                
+                if is_crafted:
+                    tk.Label(right, text="✅ Owned", font=ui["font_small_bold"],
+                             bg=card_bg, fg=ui["success"], anchor="e").pack(anchor="e", pady=2)
+                elif can_craft:
+                    def do_craft(iid=item_id):
+                        success, msg = self._craft_item(iid)
+                        if success:
+                            messagebox.showinfo("🔨 Crafted!", msg)
+                        else:
+                            self._show_popup_error("Cannot Craft", msg)
+                        refresh_recipes()
+                    
+                    craft_btn = self._styled_button(right, "🔨 Craft", do_craft,
+                                                    style="gold", width=8, small=True)
+                    craft_btn.pack(anchor="e", pady=2)
+                elif is_discovered:
+                    tk.Label(right, text="Insufficient", font=ui["font_small"],
+                             bg=card_bg, fg=ui["danger"], anchor="e").pack(anchor="e", pady=2)
+                else:
+                    tk.Label(right, text="🔒 Locked", font=ui["font_small"],
+                             bg=card_bg, fg=ui["text_muted"], anchor="e").pack(anchor="e", pady=2)
+                
+                # Separator
+                sep = tk.Frame(scrollable_frame, bg=ui["border"], height=1)
+                sep.pack(fill=tk.X, padx=10)
+        
+        def set_filter(t):
+            current_filter[0] = t
+            for b in filter_btns:
+                b.config(bg=ui["bg_secondary"], fg=ui["text_secondary"])
+            filter_btns[t].config(bg=ui["accent"], fg="#ffffff")
+            refresh_recipes()
+        
+        filter_labels = ["All", "⚪ Common", "🟢 Uncommon", "🔵 Rare", "🟣 Epic", "🟠 Legendary"]
+        filter_btns = []
+        for i, label in enumerate(filter_labels):
+            btn = tk.Label(filter_frame, text=label, font=ui["font_small_bold"],
+                           bg=ui["bg_secondary"] if i != 0 else ui["accent"],
+                           fg=ui["text_secondary"] if i != 0 else "#ffffff",
+                           padx=12, pady=4, cursor="hand2")
+            btn.pack(side=tk.LEFT, padx=2)
+            btn.bind("<Button-1>", lambda e, idx=i: set_filter(idx))
+            filter_btns.append(btn)
+        
+        # ── Scrollable recipe list ──
+        recipe_outer, recipe_card = self._styled_card(craft_win, "Recipes")
+        recipe_outer.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 10))
+        
+        scroll_outer, scrollable_frame = self._styled_scrollable(recipe_card, ui["bg_card"])
+        scroll_outer.pack(fill=tk.BOTH, expand=True)
+        
+        refresh_recipes()
+    
+    # ===== CLANS WINDOW =====
+    
+    def show_clans_window(self):
+        """Show the Clans / Guilds window"""
+        ui = self._ui
+        clan_win = self._styled_toplevel("🏰 Clans & Guilds", 880, 740)
+        self._styled_header(clan_win, "Clans & Guilds",
+                            "Join forces, earn shared perks, dominate the leaderboard", icon="🏰")
+        
+        # Tab system
+        tab_frame = tk.Frame(clan_win, bg=ui["bg_secondary"])
+        tab_frame.pack(fill=tk.X)
+        
+        content_frame = tk.Frame(clan_win, bg=ui["bg_primary"])
+        content_frame.pack(fill=tk.BOTH, expand=True)
+        
+        current_tab = [0]
+        
+        def clear_content():
+            for w in content_frame.winfo_children():
+                w.destroy()
+        
+        def show_my_clan():
+            clear_content()
+            current_tab[0] = 0
+            update_tab_styles()
+            
+            if not self.player_clan:
+                # Not in a clan — show create/join options
+                no_clan_outer, no_clan_card = self._styled_card(content_frame, "You're not in a clan yet")
+                no_clan_outer.pack(fill=tk.X, padx=15, pady=15)
+                
+                tk.Label(no_clan_card, text="Join a clan to earn shared perks and compete on the clan leaderboard!",
+                         font=ui["font_body"], bg=ui["bg_card"], fg=ui["text_secondary"],
+                         wraplength=600).pack(pady=10)
+                
+                # Create clan
+                create_frame = tk.Frame(no_clan_card, bg=ui["bg_card"])
+                create_frame.pack(fill=tk.X, pady=10)
+                tk.Label(create_frame, text="Create a New Clan:", font=ui["font_subhead"],
+                         bg=ui["bg_card"], fg=ui["accent_light"]).pack(anchor="w")
+                
+                name_row = tk.Frame(create_frame, bg=ui["bg_card"])
+                name_row.pack(fill=tk.X, pady=5)
+                name_entry = tk.Entry(name_row, font=ui["font_body"], bg=ui["bg_secondary"],
+                                      fg=ui["text_primary"], insertbackground=ui["text_primary"],
+                                      relief=tk.FLAT, width=25)
+                name_entry.pack(side=tk.LEFT, padx=(0, 10))
+                name_entry.insert(0, "Enter clan name...")
+                name_entry.bind("<FocusIn>", lambda e: name_entry.delete(0, tk.END) if name_entry.get() == "Enter clan name..." else None)
+                
+                def do_create():
+                    success, msg = self._create_clan(name_entry.get())
+                    if success:
+                        messagebox.showinfo("🏰 Clan Created!", msg)
+                        show_my_clan()
+                    else:
+                        self._show_popup_error("Error", msg)
+                
+                self._styled_button(name_row, "Create", do_create, style="success", width=8).pack(side=tk.LEFT)
+                
+                # Browse button
+                tk.Label(no_clan_card, text="— or —", font=ui["font_body"],
+                         bg=ui["bg_card"], fg=ui["text_muted"]).pack(pady=5)
+                self._styled_button(no_clan_card, "Browse Clans", show_browse_clans,
+                                    style="primary", width=16).pack(pady=5)
+                return
+            
+            # Show current clan info
+            clan = self.clans_data.get("clans", {}).get(self.player_clan, {})
+            level, xp_cur, xp_max = self._get_clan_level(self.player_clan)
+            members = clan.get("members", [])
+            contributions = clan.get("contributions", {})
+            
+            # Clan header
+            info_outer, info_card = self._styled_card(content_frame, f"🏰 {self.player_clan}")
+            info_outer.pack(fill=tk.X, padx=15, pady=(10, 5))
+            
+            stats_row = tk.Frame(info_card, bg=ui["bg_card"])
+            stats_row.pack(fill=tk.X)
+            
+            for label_text, value_text, color in [
+                ("Level", str(level), ui["accent_light"]),
+                ("XP", f"{xp_cur}/{xp_max}", ui["xp_color"]),
+                ("Members", f"{len(members)}/20", ui["info"]),
+                ("Total Wins", str(clan.get("total_wins", 0)), ui["success"]),
+                ("Leader", clan.get("leader", "?"), ui["gold"]),
+            ]:
+                pill = tk.Frame(stats_row, bg=ui["bg_secondary"], padx=10, pady=6)
+                pill.pack(side=tk.LEFT, padx=4, fill=tk.X, expand=True)
+                tk.Label(pill, text=label_text, font=ui["font_small"], bg=ui["bg_secondary"],
+                         fg=ui["text_muted"]).pack()
+                tk.Label(pill, text=value_text, font=ui["font_body_bold"], bg=ui["bg_secondary"],
+                         fg=color).pack()
+            
+            # XP progress bar
+            bar_frame = tk.Frame(info_card, bg=ui["bg_secondary"], height=12)
+            bar_frame.pack(fill=tk.X, padx=5, pady=(8, 5))
+            bar_frame.pack_propagate(False)
+            pct = xp_cur / max(1, xp_max)
+            fill = tk.Frame(bar_frame, bg=ui["xp_color"], width=int(pct * 600))
+            fill.place(x=0, y=0, relheight=1.0)
+            
+            # Motto
+            motto = clan.get("motto", "No motto set")
+            tk.Label(info_card, text=f'"{motto}"', font=("Segoe UI", 10, "italic"),
+                     bg=ui["bg_card"], fg=ui["text_secondary"]).pack(pady=5)
+            
+            # Members list
+            members_outer, members_card = self._styled_card(content_frame, "Members & Contributions")
+            members_outer.pack(fill=tk.BOTH, expand=True, padx=15, pady=5)
+            
+            scroll_out, scroll_inner = self._styled_scrollable(members_card, ui["bg_card"])
+            scroll_out.pack(fill=tk.BOTH, expand=True)
+            
+            sorted_members = sorted(members, key=lambda m: contributions.get(m, 0), reverse=True)
+            for i, member in enumerate(sorted_members):
+                mf = tk.Frame(scroll_inner, bg=ui["bg_card"], pady=4)
+                mf.pack(fill=tk.X, padx=5)
+                rank = "👑" if member == clan.get("leader") else f"#{i+1}"
+                contrib = contributions.get(member, 0)
+                is_you = " (You)" if member == self.current_username else ""
+                tk.Label(mf, text=f"{rank}  {member}{is_you}", font=ui["font_body"],
+                         bg=ui["bg_card"], fg=ui["text_primary"], anchor="w").pack(side=tk.LEFT)
+                tk.Label(mf, text=f"{contrib} XP contributed", font=ui["font_small"],
+                         bg=ui["bg_card"], fg=ui["xp_color"], anchor="e").pack(side=tk.RIGHT)
+            
+            # Leave button
+            btn_frame = tk.Frame(content_frame, bg=ui["bg_primary"])
+            btn_frame.pack(fill=tk.X, padx=15, pady=10)
+            
+            def do_leave():
+                if messagebox.askyesno("Leave Clan", f"Leave '{self.player_clan}'?"):
+                    success, msg = self._leave_clan()
+                    if success:
+                        messagebox.showinfo("Left", msg)
+                        show_my_clan()
+                    else:
+                        self._show_popup_error("Error", msg)
+            
+            self._styled_button(btn_frame, "Leave Clan", do_leave, style="danger", width=12).pack(side=tk.RIGHT)
+        
+        def show_browse_clans():
+            clear_content()
+            current_tab[0] = 1
+            update_tab_styles()
+            
+            browse_outer, browse_card = self._styled_card(content_frame, "Available Clans")
+            browse_outer.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+            
+            scroll_out, scroll_inner = self._styled_scrollable(browse_card, ui["bg_card"])
+            scroll_out.pack(fill=tk.BOTH, expand=True)
+            
+            clans = self.clans_data.get("clans", {})
+            if not clans:
+                tk.Label(scroll_inner, text="No clans exist yet. Be the first to create one!",
+                         font=ui["font_body"], bg=ui["bg_card"], fg=ui["text_muted"]).pack(pady=20)
+                return
+            
+            sorted_clans = sorted(clans.items(), key=lambda x: x[1].get("total_xp", 0), reverse=True)
+            for clan_name, clan_info in sorted_clans:
+                level, _, _ = self._get_clan_level(clan_name)
+                members_count = len(clan_info.get("members", []))
+                
+                cf = tk.Frame(scroll_inner, bg=ui["bg_card"], pady=8, padx=10)
+                cf.pack(fill=tk.X, padx=5, pady=3)
+                
+                left = tk.Frame(cf, bg=ui["bg_card"])
+                left.pack(side=tk.LEFT, fill=tk.Y)
+                
+                tk.Label(left, text=f"🏰 {clan_name}", font=ui["font_body_bold"],
+                         bg=ui["bg_card"], fg=ui["accent_light"], anchor="w").pack(anchor="w")
+                tk.Label(left, text=f"Level {level} • {members_count}/20 members • {clan_info.get('total_wins', 0)} wins",
+                         font=ui["font_small"], bg=ui["bg_card"], fg=ui["text_secondary"]).pack(anchor="w")
+                tk.Label(left, text=f'Leader: {clan_info.get("leader", "?")}',
+                         font=ui["font_small"], bg=ui["bg_card"], fg=ui["gold"]).pack(anchor="w")
+                
+                right = tk.Frame(cf, bg=ui["bg_card"])
+                right.pack(side=tk.RIGHT, fill=tk.Y)
+                
+                if self.player_clan == clan_name:
+                    tk.Label(right, text="✅ Your Clan", font=ui["font_small_bold"],
+                             bg=ui["bg_card"], fg=ui["success"]).pack(anchor="e", pady=5)
+                elif not self.player_clan and members_count < 20:
+                    def do_join(cn=clan_name):
+                        success, msg = self._join_clan(cn)
+                        if success:
+                            messagebox.showinfo("🏰 Joined!", msg)
+                            show_my_clan()
+                        else:
+                            self._show_popup_error("Error", msg)
+                    self._styled_button(right, "Join", do_join, style="success", width=6, small=True).pack(anchor="e", pady=5)
+                elif members_count >= 20:
+                    tk.Label(right, text="FULL", font=ui["font_small_bold"],
+                             bg=ui["bg_card"], fg=ui["danger"]).pack(anchor="e", pady=5)
+                
+                sep = tk.Frame(scroll_inner, bg=ui["border"], height=1)
+                sep.pack(fill=tk.X, padx=10)
+        
+        def show_clan_leaderboard():
+            clear_content()
+            current_tab[0] = 2
+            update_tab_styles()
+            
+            lb_outer, lb_card = self._styled_card(content_frame, "🏆 Clan Leaderboard")
+            lb_outer.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+            
+            scroll_out, scroll_inner = self._styled_scrollable(lb_card, ui["bg_card"])
+            scroll_out.pack(fill=tk.BOTH, expand=True)
+            
+            clans = self.clans_data.get("clans", {})
+            sorted_clans = sorted(clans.items(), key=lambda x: x[1].get("total_xp", 0), reverse=True)
+            
+            medals = ["🥇", "🥈", "🥉"]
+            for i, (clan_name, clan_info) in enumerate(sorted_clans):
+                level, _, _ = self._get_clan_level(clan_name)
+                medal = medals[i] if i < 3 else f"#{i+1}"
+                is_mine = " ⭐" if clan_name == self.player_clan else ""
+                
+                row_bg = "#1a1a3a" if clan_name == self.player_clan else ui["bg_card"]
+                rf = tk.Frame(scroll_inner, bg=row_bg, pady=6, padx=10)
+                rf.pack(fill=tk.X, padx=5, pady=2)
+                
+                tk.Label(rf, text=f"{medal}  🏰 {clan_name}{is_mine}", font=ui["font_body_bold"],
+                         bg=row_bg, fg=ui["text_primary"], anchor="w").pack(side=tk.LEFT)
+                
+                stats_text = f"Lv.{level} • {clan_info.get('total_xp', 0)} XP • {clan_info.get('total_wins', 0)} wins • {len(clan_info.get('members', []))} members"
+                tk.Label(rf, text=stats_text, font=ui["font_small"],
+                         bg=row_bg, fg=ui["text_secondary"], anchor="e").pack(side=tk.RIGHT)
+        
+        def show_clan_perks():
+            clear_content()
+            current_tab[0] = 3
+            update_tab_styles()
+            
+            perks_outer, perks_card = self._styled_card(content_frame, "🎁 Clan Perks")
+            perks_outer.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+            
+            my_level = 0
+            if self.player_clan:
+                my_level, _, _ = self._get_clan_level(self.player_clan)
+            
+            scroll_out, scroll_inner = self._styled_scrollable(perks_card, ui["bg_card"])
+            scroll_out.pack(fill=tk.BOTH, expand=True)
+            
+            for perk_level in sorted(self.clan_perks.keys()):
+                perk = self.clan_perks[perk_level]
+                unlocked = my_level >= perk_level
+                
+                pf = tk.Frame(scroll_inner, bg=ui["bg_card"], pady=8, padx=10)
+                pf.pack(fill=tk.X, padx=5, pady=3)
+                
+                icon = "✅" if unlocked else "🔒"
+                color = ui["success"] if unlocked else ui["text_muted"]
+                
+                tk.Label(pf, text=f"{icon}  Level {perk_level}: {perk['name']}", font=ui["font_body_bold"],
+                         bg=ui["bg_card"], fg=color, anchor="w").pack(anchor="w")
+                tk.Label(pf, text=perk["desc"], font=ui["font_small"],
+                         bg=ui["bg_card"], fg=ui["text_secondary"] if unlocked else ui["text_muted"],
+                         anchor="w").pack(anchor="w")
+                
+                sep = tk.Frame(scroll_inner, bg=ui["border"], height=1)
+                sep.pack(fill=tk.X, padx=10)
+        
+        # Tab buttons
+        tab_buttons = []
+        tab_actions = [show_my_clan, show_browse_clans, show_clan_leaderboard, show_clan_perks]
+        tab_labels = ["🏰 My Clan", "🔍 Browse", "🏆 Leaderboard", "🎁 Perks"]
+        
+        def update_tab_styles():
+            for i, btn in enumerate(tab_buttons):
+                if i == current_tab[0]:
+                    btn.config(bg=ui["accent"], fg="#ffffff")
+                else:
+                    btn.config(bg=ui["bg_secondary"], fg=ui["text_secondary"])
+        
+        for i, label in enumerate(tab_labels):
+            btn = tk.Label(tab_frame, text=label, font=ui["font_btn_sm"],
+                           bg=ui["bg_secondary"], fg=ui["text_secondary"],
+                           padx=18, pady=8, cursor="hand2")
+            btn.pack(side=tk.LEFT, padx=1)
+            btn.bind("<Button-1>", lambda e, action=tab_actions[i]: action())
+            tab_buttons.append(btn)
+        
+        show_my_clan()
+    
+    # ===== STRING POKÉDEX WINDOW =====
+    
+    def show_pokedex_window(self):
+        """Show the String Pokédex collection window"""
+        ui = self._ui
+        pdx_win = self._styled_toplevel("📚 String Pokédex", 880, 740)
+        self._styled_header(pdx_win, "String Pokédex",
+                            "Every winning string collected and catalogued", icon="📚")
+        
+        # Stats bar
+        stats = self._get_pokedex_stats()
+        stats_outer, stats_card = self._styled_card(pdx_win, "Collection Stats")
+        stats_outer.pack(fill=tk.X, padx=15, pady=(10, 5))
+        
+        stats_row = tk.Frame(stats_card, bg=ui["bg_card"])
+        stats_row.pack(fill=tk.X)
+        
+        for label_text, value_text, color in [
+            ("Total Caught", str(stats["total_caught"]), ui["accent_light"]),
+            ("Stored", str(stats["entries_stored"]), ui["info"]),
+            ("Unique Combos", f"{stats['unique_combos']}/{stats['total_possible_combos']}", ui["gold"]),
+        ]:
+            pill = tk.Frame(stats_row, bg=ui["bg_secondary"], padx=10, pady=6)
+            pill.pack(side=tk.LEFT, padx=4, fill=tk.X, expand=True)
+            tk.Label(pill, text=label_text, font=ui["font_small"], bg=ui["bg_secondary"],
+                     fg=ui["text_muted"]).pack()
+            tk.Label(pill, text=value_text, font=ui["font_body_bold"], bg=ui["bg_secondary"],
+                     fg=color).pack()
+        
+        # Rarity distribution
+        rc = stats["rarity_counts"]
+        rarity_row = tk.Frame(stats_card, bg=ui["bg_card"])
+        rarity_row.pack(fill=tk.X, pady=(5, 0))
+        
+        rarity_display = [
+            ("⬜", "Common", rc.get("Common", 0), "#b0bec5"),
+            ("🟩", "Uncommon", rc.get("Uncommon", 0), "#66bb6a"),
+            ("🟦", "Rare", rc.get("Rare", 0), "#42a5f5"),
+            ("🟪", "Epic", rc.get("Epic", 0), "#ab47bc"),
+            ("🟧", "Legendary", rc.get("Legendary", 0), "#ffa726"),
+            ("💜", "Mythic", rc.get("Mythic", 0), "#ff4081"),
+        ]
+        for icon, name, count, color in rarity_display:
+            rf = tk.Frame(rarity_row, bg=ui["bg_secondary"], padx=6, pady=3)
+            rf.pack(side=tk.LEFT, padx=3)
+            tk.Label(rf, text=f"{icon} {count}", font=ui["font_small_bold"],
+                     bg=ui["bg_secondary"], fg=color).pack()
+        
+        # Filter buttons
+        filter_frame = tk.Frame(pdx_win, bg=ui["bg_primary"])
+        filter_frame.pack(fill=tk.X, padx=15, pady=5)
+        
+        current_filter = ["All"]
+        
+        def refresh_entries():
+            for widget in scrollable_frame.winfo_children():
+                widget.destroy()
+            
+            rarity_filter = current_filter[0]
+            entries = list(reversed(self.pokedex_entries))
+            
+            if rarity_filter != "All":
+                entries = [e for e in entries if e.get("rarity") == rarity_filter]
+            
+            if not entries:
+                tk.Label(scrollable_frame, text="No entries found. Win matches to collect strings!",
+                         font=ui["font_body"], bg=ui["bg_card"], fg=ui["text_muted"]).pack(pady=20)
+                return
+            
+            for entry in entries[:100]:  # Show last 100
+                entry_bg = ui["bg_card"]
+                ef = tk.Frame(scrollable_frame, bg=entry_bg, pady=6, padx=12)
+                ef.pack(fill=tk.X, padx=5, pady=2)
+                
+                # Header row: ID + rarity
+                top_row = tk.Frame(ef, bg=entry_bg)
+                top_row.pack(fill=tk.X)
+                
+                rarity_color = entry.get("rarity_color", "#b0bec5")
+                rarity_icon = entry.get("rarity_icon", "⬜")
+                stars = entry.get("stars", "★")
+                
+                tk.Label(top_row, text=f"#{entry.get('id', '?')}", font=ui["font_body_bold"],
+                         bg=entry_bg, fg=ui["text_muted"], anchor="w").pack(side=tk.LEFT)
+                tk.Label(top_row, text=f"  {rarity_icon} {entry.get('rarity', 'Common')} {stars}",
+                         font=ui["font_small_bold"], bg=entry_bg, fg=rarity_color).pack(side=tk.LEFT, padx=10)
+                
+                if entry.get("is_new_combo"):
+                    tk.Label(top_row, text="🆕 NEW COMBO", font=ui["font_small_bold"],
+                             bg=entry_bg, fg=ui["gold"]).pack(side=tk.LEFT, padx=5)
+                
+                # Timestamp
+                ts = entry.get("timestamp", "")[:16].replace("T", " ")
+                tk.Label(top_row, text=ts, font=ui["font_small"],
+                         bg=entry_bg, fg=ui["text_muted"]).pack(side=tk.RIGHT)
+                
+                # String display
+                display_str = entry.get("string", "")
+                if len(display_str) > 80:
+                    display_str = display_str[:77] + "..."
+                tk.Label(ef, text=f'"{display_str}"', font=ui["font_mono"],
+                         bg=entry_bg, fg=rarity_color, anchor="w", wraplength=700).pack(anchor="w", pady=(2, 0))
+                
+                # Properties
+                props = entry.get("properties", [])
+                props_text = " • ".join(props)
+                tk.Label(ef, text=props_text, font=ui["font_small"],
+                         bg=entry_bg, fg=ui["text_secondary"], anchor="w", wraplength=700).pack(anchor="w")
+                
+                sep = tk.Frame(scrollable_frame, bg=ui["border"], height=1)
+                sep.pack(fill=tk.X, padx=10)
+        
+        def set_filter(f):
+            current_filter[0] = f
+            for b in filter_btns:
+                b.config(bg=ui["bg_secondary"], fg=ui["text_secondary"])
+            filter_btns[filter_names.index(f)].config(bg=ui["accent"], fg="#ffffff")
+            refresh_entries()
+        
+        filter_names = ["All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"]
+        filter_icons = ["🔎", "⬜", "🟩", "🟦", "🟪", "🟧", "💜"]
+        filter_btns = []
+        for i, (name, icon) in enumerate(zip(filter_names, filter_icons)):
+            lbl = f"{icon} {name}"
+            btn = tk.Label(filter_frame, text=lbl, font=ui["font_small_bold"],
+                           bg=ui["accent"] if i == 0 else ui["bg_secondary"],
+                           fg="#ffffff" if i == 0 else ui["text_secondary"],
+                           padx=10, pady=4, cursor="hand2")
+            btn.pack(side=tk.LEFT, padx=2)
+            btn.bind("<Button-1>", lambda e, n=name: set_filter(n))
+            filter_btns.append(btn)
+        
+        # Scrollable entries
+        entries_outer, entries_card = self._styled_card(pdx_win, "Collection")
+        entries_outer.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 10))
+        
+        scroll_outer, scrollable_frame = self._styled_scrollable(entries_card, ui["bg_card"])
+        scroll_outer.pack(fill=tk.BOTH, expand=True)
+        
+        refresh_entries()
     
     def show_dev_console(self):
         """Show developer console (only for DeMarcusThe2nd)"""
