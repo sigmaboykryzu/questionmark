@@ -5616,6 +5616,10 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         self.equipment_inventory = self._load_equipment()
         self._load_user_tournament_scores()
         
+        # Reload crafting & strategy data for the logged-in user
+        self._init_crafting_system()
+        self._load_strategy_data()
+        
         self._setup_gui()
         try:
             self._play_startup_sound()
@@ -10362,6 +10366,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         except Exception:
             pass
         try:
+            self._save_crafting_data()
+        except Exception:
+            pass
+        try:
             self._save_strategy_data()
         except Exception:
             pass
@@ -14570,6 +14578,10 @@ Type 'help' to see this again.
         self.wins_log, self.losses_log = self._load_history()
         self.rolls_history = list(self.wins_log[-100:])
         self.equipment_inventory = self._load_equipment()
+        
+        # Reload crafting & strategy data for the logged-in user
+        self._init_crafting_system()
+        self._load_strategy_data()
         
         self._setup_gui()
         try:
