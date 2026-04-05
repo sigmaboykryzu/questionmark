@@ -18,6 +18,7 @@ user_*_test*.json
 game_settings.json
 shop_inventory.json
 tournaments.json
+clans.json
 
 # Documentation (internal)
 BUG_FIX_REPORT.md
