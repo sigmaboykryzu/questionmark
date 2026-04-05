@@ -563,6 +563,10 @@ class RollingGame:
             "xp": self.player_xp
         }
         self._save_json(meta_file, meta_data)
+        # Update in-memory copy and reset session counters to prevent double-counting
+        self.meta_progression = meta_data
+        self.session_win_count = 0
+        self.total_sp_earned_today = 0
     
     def _add_xp(self, amount):
         """Add XP and handle leveling"""
@@ -3654,7 +3658,7 @@ Playstyle Mastery:
         prestige_points = 0
         prestige_points += self.player_level // 5  # 1 point per 5 levels
         prestige_points += len(self.completed_quests) // 10  # 1 point per 10 quests
-        prestige_points += sum(1 for ach in self.achievements.values() if ach["completed"])  # 1 point per achievement
+        prestige_points += sum(1 for ach in self.achievements.values() if ach.get("unlocked"))  # 1 point per achievement
         
         # Reset progress
         self.player_level = 1
@@ -3935,7 +3939,7 @@ Properties Discovered: {len(self.stats.get('property_discoveries', {}))}
         
         # Achievement progress
         total_achievements = len(self.achievements)
-        completed_achievements = sum(1 for ach in self.achievements.values() if ach["completed"])
+        completed_achievements = sum(1 for ach in self.achievements.values() if ach.get("unlocked"))
         ach_progress = completed_achievements / total_achievements if total_achievements > 0 else 0
         self._create_progress_bar(progress_frame, "Achievements", ach_progress, 
                                 f"{completed_achievements}/{total_achievements}")
@@ -7298,13 +7302,28 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         except Exception:
             pass
         # Also write a full backup to autosave.json
+        # Serialize rolls_history entries (convert sets to lists for JSON)
+        def _serialize_entry(e):
+            entry = dict(e)
+            if isinstance(entry.get('properties'), (set, frozenset)):
+                entry['properties'] = list(entry['properties'])
+            if isinstance(entry.get('target_properties'), (set, frozenset)):
+                entry['target_properties'] = list(entry['target_properties'])
+            return entry
+        serialized_history = [_serialize_entry(e) for e in self.rolls_history[-500:]]
+        
+        # Create stats copy with inf handled
+        safe_stats = dict(self.stats)
+        if safe_stats.get('fastest_win') == float('inf'):
+            safe_stats['fastest_win'] = None
+        
         game_state = {
             "roll_count": self.roll_count,
             "wins_count": self.wins_count,
             "target_properties": list(self.target_properties),
-            "rolls_history": self.rolls_history[-500:],  # Save last 500 rolls for auto-save
+            "rolls_history": serialized_history,
             "achievements": self.achievements,
-            "stats": self.stats,
+            "stats": safe_stats,
             "theme": self.current_theme,
             "sound_enabled": self.sound_enabled,
             "animations_enabled": self.animations_enabled,
@@ -7342,6 +7361,12 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
                 self.wins_count = game_state.get("wins_count", 0)
                 self.target_properties = set(game_state.get("target_properties", []))
                 self.rolls_history = game_state.get("rolls_history", [])
+                # Convert properties back to sets after JSON deserialization
+                for entry in self.rolls_history:
+                    if isinstance(entry.get('properties'), list):
+                        entry['properties'] = set(entry['properties'])
+                    if isinstance(entry.get('target_properties'), list):
+                        entry['target_properties'] = set(entry['target_properties'])
                 self.achievements = game_state.get("achievements", self._load_achievements())
                 self.stats = game_state.get("stats", self._load_stats())
                 self.current_theme = game_state.get("theme", "dark")
@@ -7952,8 +7977,10 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         }
         return display_names.get(prop, prop)
     
-    def _update_display(self, string, properties):
+    def _update_display(self, string=None, properties=None):
         """Update the GUI display"""
+        if string is None or properties is None:
+            return
         matches = len(properties & self.target_properties)
         total_targets = len(self.target_properties)
         
@@ -8491,7 +8518,7 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                     xp_earned = 10 + (sp_gained // 5)
                     self._add_xp(xp_earned)
                     
-                    self._update_sp_label()
+                    self.root.after(0, self._update_sp_label)
                     
                     # Submit score to active tournaments
                     tournament_score = sp_gained
@@ -8559,6 +8586,14 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                     win_msg = f"✅ +{sp_gained} {sp_display} | +{xp_earned} XP{streak_text}"
                     self.root.after(0, lambda m=win_msg: self.match_label.config(
                         text=m, fg=self._ui["success"], font=("Segoe UI", 11, "bold")))
+                    
+                    # Generate new target after a win (prevent runaway wins on same target)
+                    self._generate_target()
+                
+                else:
+                    # Loss — reset streak
+                    self.stats['current_streak'] = 0
+                    self._update_winning_streak(False)
                 
                 # Yield to UI thread every few rolls to prevent freezing
                 if (roll_idx + 1) % 5 == 0:
@@ -8695,9 +8730,9 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             page_var[0] = max(0, page_var[0] + delta)
             _refresh()
         
-        tk.Button(filt_frame, text="◀ Older", font=("Segoe UI", 8), bg="#2a2a4a", fg="#cccccc",
+        tk.Button(filt_frame, text="◀ Newer", font=("Segoe UI", 8), bg="#2a2a4a", fg="#cccccc",
                   relief=tk.FLAT, command=lambda: _go_page(-1)).pack(side=tk.RIGHT, padx=2)
-        tk.Button(filt_frame, text="Newer ▶", font=("Segoe UI", 8), bg="#2a2a4a", fg="#cccccc",
+        tk.Button(filt_frame, text="Older ▶", font=("Segoe UI", 8), bg="#2a2a4a", fg="#cccccc",
                   relief=tk.FLAT, command=lambda: _go_page(1)).pack(side=tk.RIGHT, padx=2)
         
         # Scrollable canvas
@@ -8781,8 +8816,12 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         """Create a single colour-coded roll card"""
         won = entry.get('won', False)
         is_crit = entry.get('is_critical', False)
-        matches = entry.get('matches', len(entry.get('properties', set()) & entry.get('target_properties', set())))
-        total = entry.get('total_needed', len(entry.get('target_properties', set())))
+        props = entry.get('properties', set())
+        tgt = entry.get('target_properties', set())
+        if isinstance(props, list): props = set(props)
+        if isinstance(tgt, list): tgt = set(tgt)
+        matches = entry.get('matches', len(props & tgt))
+        total = entry.get('total_needed', len(tgt))
         match_pct = entry.get('match_pct', round(matches / max(1, total) * 100, 1))
         
         # Card colours
@@ -9426,6 +9465,38 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         self._save_equipment()
         self._save_history()
         self._save_settings()
+        try:
+            self._save_pvp_data()
+        except Exception:
+            pass
+        try:
+            self._save_meta_progression()
+        except Exception:
+            pass
+        try:
+            self._save_challenge_progress()
+        except Exception:
+            pass
+        try:
+            self._save_pokedex()
+        except Exception:
+            pass
+        try:
+            self._save_crafting_data()
+        except Exception:
+            pass
+        try:
+            self._save_strategy_data()
+        except Exception:
+            pass
+        try:
+            self._save_clan_data()
+        except Exception:
+            pass
+        try:
+            self._save_progression_data()
+        except Exception:
+            pass
         messagebox.showinfo("Save", "Game saved successfully!")
     
     # ══════════════════════════════════════════════════════════════════
@@ -14590,8 +14661,10 @@ Type 'help' to see this again.
             print(f"Error playing startup sound: {e}")
         
         # Update labels with loaded stats
-        self.roll_label.config(text=str(self.roll_count))
-        self.wins_label.config(text=str(self.wins_count))
+        if hasattr(self, 'roll_label'):
+            self.roll_label.config(text=str(self.roll_count))
+        if hasattr(self, 'wins_label'):
+            self.wins_label.config(text=str(self.wins_count))
         self._update_sp_label()
         
         # Start the event loop
