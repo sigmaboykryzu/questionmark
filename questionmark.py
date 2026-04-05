@@ -13678,7 +13678,7 @@ Type 'help' to see this again.
                     
                     # 7. Learn ALL skills in skill tree
                     skill_count = 0
-                    for key, skill in self.skill_tree.items():
+                    for key, skill in self.skills.items():
                         if not skill.get("learned"):
                             skill_count += 1
                         skill["learned"] = True
