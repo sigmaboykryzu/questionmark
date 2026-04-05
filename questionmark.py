@@ -306,10 +306,10 @@ class RollingGame:
         self.rolls_history = []  # Initialize empty, will be loaded below
         self.mini_game_best = 0  # Best mini-game score
         
-        # Load roll history
-        self.rolls_history = self._load_history()
-        # wins_log stores every win persistently (separate from the rolling in-memory buffer)
-        self.wins_log = [e for e in self.rolls_history if e.get("won")]
+        # Load roll history (wins + losses persisted separately)
+        self.wins_log, self.losses_log = self._load_history()
+        # rolls_history is the in-memory recent-rolls buffer (populated during gameplay)
+        self.rolls_history = list(self.wins_log[-100:])  # Seed with recent wins so history tab works immediately
         
         # Daily Challenge System
         self.daily_challenges = self._init_daily_challenges()
@@ -5611,8 +5611,8 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         self.stats = self._load_stats()
         self.roll_count = self.stats.get("total_rolls", 0)
         self.wins_count = self.stats.get("total_wins", 0)
-        self.rolls_history = self._load_history()
-        self.wins_log = [e for e in self.rolls_history if e.get("won", True)]
+        self.wins_log, self.losses_log = self._load_history()
+        self.rolls_history = list(self.wins_log[-100:])
         self.equipment_inventory = self._load_equipment()
         self._load_user_tournament_scores()
         
@@ -6725,14 +6725,24 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
         self._save_json(ach_file, self.achievements)
     
     def _load_history(self):
-        """Load win history from file (per-user). History file stores wins only."""
+        """Load roll history from file (per-user). Supports both old (list) and new (dict with wins/losses) formats."""
         hist_file = self.account_manager.get_user_history_file(self.current_username) if self.current_username else "history.json"
         try:
             with open(hist_file, "r") as f:
-                raw_history = json.load(f)
-                normalized_history = []
-                for entry in raw_history:
-                    normalized_history.append({
+                raw = json.load(f)
+            # New format: {"wins": [...], "losses": [...]}
+            if isinstance(raw, dict) and "wins" in raw:
+                wins_raw = raw.get("wins", [])
+                losses_raw = raw.get("losses", [])
+            else:
+                # Old format: flat list (all wins)
+                wins_raw = raw if isinstance(raw, list) else []
+                losses_raw = []
+            
+            def _normalize(entries, default_won=True):
+                out = []
+                for entry in entries:
+                    out.append({
                         "number": entry.get("number", 0),
                         "string": entry.get("string", ""),
                         "properties": set(entry.get("properties", [])),
@@ -6740,45 +6750,55 @@ Current Rank: {self.rank_titles.get(self.player_level, 'Unknown')}
                         "matches": entry.get("matches", 0),
                         "total_needed": entry.get("total_needed", 0),
                         "timestamp": entry.get("timestamp", ""),
-                        "won": entry.get("won", True),   # history file is wins-only
+                        "won": entry.get("won", default_won),
+                        "near_miss": entry.get("near_miss", False),
                         "sp_earned": entry.get("sp_earned", 0),
                         "xp_earned": entry.get("xp_earned", 0),
                         "is_critical": entry.get("is_critical", False),
-                        "match_pct": entry.get("match_pct", 100.0)
+                        "match_pct": entry.get("match_pct", 0.0)
                     })
-                return normalized_history
+                return out
+            
+            return _normalize(wins_raw, True), _normalize(losses_raw, False)
         except Exception:
-            return []
+            return [], []
     
     def _save_history(self):
-        """Save win history to file — wins only, capped at 5000 entries."""
+        """Save roll history to file — both wins and notable losses, capped."""
         hist_file = self.account_manager.get_user_history_file(self.current_username) if self.current_username else "history.json"
-        wins_to_save = getattr(self, 'wins_log', [])
-        # Cap at 5000 most recent wins
-        wins_to_save = wins_to_save[-5000:]
-        history_out = []
-        for entry in wins_to_save:
-            props = entry.get("properties", set())
-            if isinstance(props, set):
-                props = list(props)
-            target_props = entry.get("target_properties", set())
-            if isinstance(target_props, set):
-                target_props = list(target_props)
-            history_out.append({
-                "number": entry.get("number", 0),
-                "string": entry.get("string", ""),
-                "properties": props,
-                "target_properties": target_props,
-                "matches": entry.get("matches", 0),
-                "total_needed": entry.get("total_needed", 0),
-                "timestamp": entry.get("timestamp", ""),
-                "won": True,
-                "sp_earned": entry.get("sp_earned", 0),
-                "xp_earned": entry.get("xp_earned", 0),
-                "is_critical": entry.get("is_critical", False),
-                "match_pct": entry.get("match_pct", 100.0)
-            })
-        self._save_json(hist_file, history_out)
+        
+        def _serialize(entries, cap):
+            entries = entries[-cap:]
+            out = []
+            for entry in entries:
+                props = entry.get("properties", set())
+                if isinstance(props, set):
+                    props = list(props)
+                target_props = entry.get("target_properties", set())
+                if isinstance(target_props, set):
+                    target_props = list(target_props)
+                out.append({
+                    "number": entry.get("number", 0),
+                    "string": entry.get("string", ""),
+                    "properties": props,
+                    "target_properties": target_props,
+                    "matches": entry.get("matches", 0),
+                    "total_needed": entry.get("total_needed", 0),
+                    "timestamp": entry.get("timestamp", ""),
+                    "won": entry.get("won", False),
+                    "near_miss": entry.get("near_miss", False),
+                    "sp_earned": entry.get("sp_earned", 0),
+                    "xp_earned": entry.get("xp_earned", 0),
+                    "is_critical": entry.get("is_critical", False),
+                    "match_pct": entry.get("match_pct", 0.0)
+                })
+            return out
+        
+        data = {
+            "wins": _serialize(getattr(self, 'wins_log', []), 5000),
+            "losses": _serialize(getattr(self, 'losses_log', []), 2000),
+        }
+        self._save_json(hist_file, data)
     
     def _load_stats(self):
         """Load statistics from file (per-user)"""
@@ -8292,6 +8312,19 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             # Update progression systems on loss
             self._update_progression_after_roll(False, 0, 0)
             
+            # === Append notable losses (near misses / 50%+ match) to persistent losses_log ===
+            if not hasattr(self, 'losses_log'):
+                self.losses_log = []
+            if self.rolls_history:
+                last = self.rolls_history[-1]
+                if last.get('near_miss') or last.get('match_pct', 0) >= 50:
+                    self.losses_log.append(last)
+                    if len(self.losses_log) > 2000:
+                        self.losses_log = self.losses_log[-2000:]
+                    # Save every 20 notable losses
+                    if len(self.losses_log) % 20 == 0:
+                        self._save_history()
+            
             # Update unlock progress bar
             if hasattr(self, 'unlock_progress_label'):
                 self._update_unlock_progress_bar()
@@ -8371,9 +8404,36 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
                 subset_match = self.target_properties <= properties
                 won = subset_match and (random.random() < self._get_win_confirmation_chance())
                 
+                # Enrich history entry with match data
+                matches = len(properties & self.target_properties)
+                total_needed = len(self.target_properties)
+                match_pct = round(matches / max(1, total_needed) * 100, 1)
+                near_miss = subset_match and not won
+                if self.rolls_history:
+                    self.rolls_history[-1].update({
+                        'won': won,
+                        'near_miss': near_miss,
+                        'matches': matches,
+                        'total_needed': total_needed,
+                        'match_pct': match_pct,
+                        'sp_earned': 0,
+                        'xp_earned': 0,
+                        'is_critical': False,
+                        'timestamp': __import__('datetime').datetime.now().isoformat()
+                    })
+                
                 # Apply temporary effects
                 self._update_temp_effect('temp_luck_boost')
                 self._update_temp_effect('temp_xp_boost')
+                
+                # === Append notable losses to persistent losses_log ===
+                if not won and (near_miss or match_pct >= 50):
+                    if not hasattr(self, 'losses_log'):
+                        self.losses_log = []
+                    if self.rolls_history:
+                        self.losses_log.append(self.rolls_history[-1])
+                        if len(self.losses_log) > 2000:
+                            self.losses_log = self.losses_log[-2000:]
                 
                 if won:
                     self.wins_count += 1
@@ -8516,7 +8576,8 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
     
     def show_history_window(self):
         """Show a fully revamped roll history window with tabs, analytics, search, and export"""
-        if not self.rolls_history:
+        has_data = self.rolls_history or getattr(self, 'wins_log', []) or getattr(self, 'losses_log', [])
+        if not has_data:
             self.match_label.config(text="No rolls yet!", fg=self._ui["danger"], font=("Segoe UI", 14, "bold"))
             return
         
@@ -8535,13 +8596,16 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
         total_rolls = self.roll_count
         total_wins = self.wins_count
         wins_log = getattr(self, 'wins_log', [])
+        losses_log = getattr(self, 'losses_log', [])
         total_sp = sum(e.get('sp_earned', 0) for e in wins_log)
         total_xp = sum(e.get('xp_earned', 0) for e in wins_log)
         win_rate = (total_wins / total_rolls * 100) if total_rolls > 0 else 0
         crits = sum(1 for e in wins_log if e.get('is_critical'))
+        near_misses = sum(1 for e in losses_log if e.get('near_miss'))
         
         summary_text = (
             f"📊 {total_rolls} Rolls  |  🏆 {total_wins} Wins ({win_rate:.1f}%)  |  "
+            f"❌ {len(losses_log)} Notable Losses ({near_misses} Near Misses)  |  "
             f"⚡ {crits} Crits  |  💰 {total_sp} SP  |  ✨ {total_xp} XP"
         )
         tk.Label(header, text=summary_text, font=("Segoe UI", 11, "bold"),
@@ -8660,14 +8724,29 @@ Play Time: {self.stats.get('play_time', 0)/3600:.1f} hours"""
             
             f = filter_var.get()
             wins_log = getattr(self, 'wins_log', [])
+            losses_log = getattr(self, 'losses_log', [])
             if f == "all":
-                # Recent rolls buffer (last 1000) — not all-time
-                data = list(self.rolls_history)
+                # Merge persistent wins + losses, deduplicate by roll number
+                seen = set()
+                merged = []
+                for e in wins_log + losses_log:
+                    key = e.get('number', id(e))
+                    if key not in seen:
+                        seen.add(key)
+                        merged.append(e)
+                # Also add recent in-memory rolls not yet persisted
+                for e in self.rolls_history:
+                    key = e.get('number', id(e))
+                    if key not in seen:
+                        seen.add(key)
+                        merged.append(e)
+                data = merged
             elif f == "wins":
                 # ALL recorded wins from persistent log
                 data = list(wins_log)
             elif f == "losses":
-                data = [e for e in self.rolls_history if not e.get('won')]
+                # ALL recorded notable losses from persistent log
+                data = list(losses_log)
             elif f == "crits":
                 data = [e for e in wins_log if e.get('is_critical')]
             else:
@@ -13286,8 +13365,8 @@ Type 'help' to see this again.
                         self.stats = self._load_stats()
                         self.achievements = self._load_achievements()
                         self.equipment_inventory = self._load_equipment()
-                        self.rolls_history = self._load_history()
-                        self.wins_log = [e for e in self.rolls_history if e.get("won", True)]
+                        self.wins_log, self.losses_log = self._load_history()
+                        self.rolls_history = list(self.wins_log[-100:])
                         self.roll_count = self.stats.get("total_rolls", 0)
                         self.wins_count = self.stats.get("total_wins", 0)
                         self.roll_label.config(text=str(self.roll_count))
@@ -14488,8 +14567,8 @@ Type 'help' to see this again.
         self.stats = self._load_stats()
         self.roll_count = self.stats.get("total_rolls", 0)
         self.wins_count = self.stats.get("total_wins", 0)
-        self.rolls_history = self._load_history()
-        self.wins_log = [e for e in self.rolls_history if e.get("won", True)]
+        self.wins_log, self.losses_log = self._load_history()
+        self.rolls_history = list(self.wins_log[-100:])
         self.equipment_inventory = self._load_equipment()
         
         self._setup_gui()
