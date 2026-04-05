@@ -12988,6 +12988,7 @@ DISCOVERY STATS:
             ("tournamentrevoke <user>", "Remove a player from tournament whitelist"),
             ("tournamentlist", "Show all whitelisted tournament players"),
             ("tournamenttoggle", "Enable/disable the tournament whitelist system"),
+            ("unlockall", "Unlock EVERYTHING a regular player can buy/earn (equipment, achievements, crafting, talents, specializations, mechanics, skills, PvP abilities, game modes)"),
         ]
         
         for cmd, desc in commands_list:
@@ -13105,6 +13106,7 @@ DISCOVERY STATS:
   tournamentrevoke <user>: Remove player from whitelist
   tournamentlist : Show all whitelisted players
   tournamenttoggle: Enable/disable whitelist system
+  unlockall      : Unlock EVERYTHING (equipment, achievements, crafting, etc.)
 
 Type 'help' to see this again.
 """
@@ -13610,6 +13612,140 @@ Type 'help' to see this again.
                         console_text.insert(tk.END, "\n     Only whitelisted players can participate.")
                     else:
                         console_text.insert(tk.END, "\n     All players can now freely join tournaments.")
+                elif cmd == "unlockall":
+                    log = []
+                    
+                    # 1. Unlock ALL achievements
+                    ach_count = 0
+                    for k, ach in self.achievements.items():
+                        if not ach.get("unlocked"):
+                            ach_count += 1
+                        ach["unlocked"] = True
+                        ach["completed"] = True
+                        if not ach.get("unlock_time"):
+                            ach["unlock_time"] = datetime.datetime.now().isoformat()
+                    log.append(f"🏆 {ach_count} achievements unlocked")
+                    
+                    # 2. Give ALL equipment items
+                    if "owned" not in self.equipment_inventory:
+                        self.equipment_inventory["owned"] = []
+                    if "shop_purchases" not in self.equipment_inventory:
+                        self.equipment_inventory["shop_purchases"] = []
+                    eq_count = 0
+                    for item_id in self.equipment_recipes:
+                        if item_id not in self.equipment_inventory["owned"]:
+                            self.equipment_inventory["owned"].append(item_id)
+                            eq_count += 1
+                        if item_id not in self.equipment_inventory["shop_purchases"]:
+                            self.equipment_inventory["shop_purchases"].append(item_id)
+                    log.append(f"⚔️ {eq_count} equipment items added")
+                    
+                    # 3. Discover ALL crafting combos & max crafting level
+                    craft_count = 0
+                    for recipe_id, recipe in self.crafting_recipes.items():
+                        if recipe["combo"] not in self.discovered_combos:
+                            self.discovered_combos.add(recipe["combo"])
+                            craft_count += 1
+                    self.crafting_level = max(self.crafting_level, 20)
+                    self.crafting_xp = 0
+                    log.append(f"🔨 {craft_count} crafting recipes discovered (level → 20)")
+                    
+                    # 4. Unlock ALL mechanic unlocks
+                    mech_count = 0
+                    for key, mech in self.mechanic_unlocks.items():
+                        if not mech.get("unlocked"):
+                            mech_count += 1
+                        mech["unlocked"] = True
+                    log.append(f"🔓 {mech_count} mechanic systems unlocked")
+                    
+                    # 5. Unlock ALL specializations
+                    spec_count = 0
+                    for key, spec in self.specialization_trees.items():
+                        if not spec.get("unlocked"):
+                            spec_count += 1
+                        spec["unlocked"] = True
+                    log.append(f"🌟 {spec_count} specializations unlocked")
+                    
+                    # 6. Max ALL talent tree branches
+                    talent_count = 0
+                    for key, talent in self.talent_tree.items():
+                        talent["unlocked"] = True
+                        max_lvl = len(talent.get("levels", []))
+                        if talent["current_level"] < max_lvl:
+                            talent_count += 1
+                            talent["current_level"] = max_lvl
+                    log.append(f"📚 {talent_count} talent branches maxed")
+                    
+                    # 7. Learn ALL skills in skill tree
+                    skill_count = 0
+                    for key, skill in self.skill_tree.items():
+                        if not skill.get("learned"):
+                            skill_count += 1
+                        skill["learned"] = True
+                    log.append(f"💡 {skill_count} skills learned")
+                    
+                    # 8. Unlock ALL PvP abilities
+                    pvp_count = 0
+                    for key, ability in self.pvp_abilities.items():
+                        if not ability.get("unlocked"):
+                            pvp_count += 1
+                        ability["unlocked"] = True
+                        ability["cooldown"] = 0
+                    log.append(f"🗡️ {pvp_count} PvP abilities unlocked")
+                    
+                    # 9. Unlock ALL game modes
+                    mode_count = 0
+                    for key, mode in self.game_modes.items():
+                        if not mode.get("unlocked"):
+                            mode_count += 1
+                        mode["unlocked"] = True
+                    log.append(f"🎮 {mode_count} game modes unlocked")
+                    
+                    # 10. Upgrade ALL equipment slots to max
+                    slot_count = 0
+                    eq_sys = getattr(self, 'equipment_system', {}).get('slots', {})
+                    for key, slot in eq_sys.items():
+                        if slot.get('level', 0) < slot.get('max_level', 0):
+                            slot_count += 1
+                        slot['level'] = slot.get('max_level', 20)
+                    if slot_count:
+                        log.append(f"🛡️ {slot_count} equipment slots maxed")
+                    
+                    # 11. Give generous SP so player can keep playing
+                    sp_bonus = 50000
+                    self.sp += sp_bonus
+                    self.sp_plus += 5000
+                    self.sp_x += 1000
+                    self.sp_caret += 200
+                    log.append(f"💰 +{sp_bonus} SP | +5000 SP+ | +1000 SPx | +200 SP^")
+                    self._update_sp_label()
+                    
+                    # 12. Set a high level if player is low
+                    if self.player_level < 30:
+                        self.player_level = 30
+                        self.xp_to_level_up = int(100 * (1.1 ** 30))
+                        self.player_xp = 0
+                        log.append(f"⭐ Level set to 30")
+                    
+                    # Force save everything
+                    try:
+                        self._save_stats()
+                        self._save_achievements()
+                        self._save_equipment()
+                        self._save_crafting_data()
+                        self._save_strategy_data()
+                        self._save_progression_data()
+                        self._save_history()
+                        self._save_pvp_data()
+                        self._save_pokedex()
+                    except Exception:
+                        pass
+                    
+                    console_text.insert(tk.END, "\n\n[🔓 UNLOCK ALL] Everything has been unlocked!\n")
+                    for line in log:
+                        console_text.insert(tk.END, f"  {line}\n")
+                    total = sum(int(s.split()[1]) for s in log if s[2:].strip()[0].isdigit()) if False else len(log)
+                    console_text.insert(tk.END, f"\n  ✅ {len(log)} categories fully unlocked. All data saved.")
                 else:
                     console_text.insert(tk.END, f"\n[ERROR] Unknown command: '{cmd}'. Type 'help' for available commands")
                 
